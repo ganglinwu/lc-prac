@@ -49,6 +49,8 @@ func run(args []string) error {
 		return cmdPace(args)
 	case "problems":
 		return cmdProblems(args)
+	case "attempt":
+		return cmdAttempt(args)
 	case "help", "-h", "--help":
 		usage()
 		return nil
@@ -77,6 +79,11 @@ func usage() {
   lcprac stats [-reset]
       Show what you have practised, your streak and recent sessions, and
       what is due to come back.
+  lcprac attempt [problem] [-solved|-partial|-failed] [your words]
+      Log a go at a real problem, by number or part of its title. With no
+      arguments it lists what you have attempted. No outcome flag means
+      solved. A problem you failed or half-solved is pushed to the top of
+      lcprac problems; one you solved recently drops to the bottom.
   lcprac review [-n 5] [-topic X] [-all] [-code] [id...]
       Reread the drills you keep missing, answers shown. Name ids to read
       those instead; -all widens it to everything you have ever missed, and
@@ -372,7 +379,7 @@ func cmdStats(args []string) error {
 	if next := focus(stats); next != "" {
 		fmt.Printf("next up: lcprac drill -weak  (that is %s right now)\n", next)
 	}
-	if rows := problemRows(set, store, ""); len(rows) > 0 && rows[0].tier() == 0 {
+	if rows := problemRows(set, store, "", now); len(rows) > 0 && rows[0].tier() == 0 {
 		fmt.Printf("ready for the real thing: %s: lcprac problems\n", rows[0].Ref)
 	}
 	printSessions(store, now)

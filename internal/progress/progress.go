@@ -85,12 +85,14 @@ type Store struct {
 	path     string
 	records  map[string]Record
 	sessions []Session
+	attempts []Attempt
 }
 
 type file struct {
 	Version  int       `json:"version"`
 	Records  []Record  `json:"records"`
 	Sessions []Session `json:"sessions,omitempty"`
+	Attempts []Attempt `json:"attempts,omitempty"`
 }
 
 // New returns an empty in-memory store bound to path. An empty path makes
@@ -119,6 +121,11 @@ func Load(path string) (*Store, error) {
 		}
 	}
 	s.sessions = f.Sessions
+	for _, a := range f.Attempts {
+		if a.Ref != "" {
+			s.attempts = append(s.attempts, a)
+		}
+	}
 	return s, nil
 }
 
@@ -130,7 +137,7 @@ func (s *Store) Save() error {
 	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
 		return err
 	}
-	f := file{Version: 1, Records: s.Records(), Sessions: s.sessions}
+	f := file{Version: 1, Records: s.Records(), Sessions: s.sessions, Attempts: s.attempts}
 	b, err := json.MarshalIndent(f, "", "  ")
 	if err != nil {
 		return err
@@ -335,6 +342,64 @@ func (s *Store) Due(id string, now time.Time) bool {
 		return true
 	}
 	return !now.Before(r.DueAt)
+}
+
+// Result is how a real problem went when you sat down and attempted it.
+type Result string
+
+const (
+	Failed  Result = "failed"
+	Partial Result = "partial"
+	Passed  Result = "solved"
+)
+
+// Attempt is one sitting at a real LeetCode problem, logged so the drills can
+// be ranked against what actually happened on the problem itself.
+type Attempt struct {
+	Ref    string    `json:"ref"`
+	Result Result    `json:"result"`
+	At     time.Time `json:"at"`
+	Note   string    `json:"note,omitempty"`
+}
+
+// maxAttempts bounds the log the way maxSessions bounds sittings.
+const maxAttempts = 500
+
+// LogAttempt records one go at a real problem. An empty ref is ignored, so a
+// failed lookup cannot write a nameless row.
+func (s *Store) LogAttempt(ref string, res Result, note string, now time.Time) Attempt {
+	a := Attempt{Ref: strings.TrimSpace(ref), Result: res, At: now, Note: strings.TrimSpace(note)}
+	if a.Ref == "" {
+		return a
+	}
+	s.attempts = append(s.attempts, a)
+	if len(s.attempts) > maxAttempts {
+		s.attempts = s.attempts[len(s.attempts)-maxAttempts:]
+	}
+	return a
+}
+
+// Attempts returns every logged problem attempt, newest first.
+func (s *Store) Attempts() []Attempt {
+	out := make([]Attempt, len(s.attempts))
+	copy(out, s.attempts)
+	sort.SliceStable(out, func(i, j int) bool { return out[i].At.After(out[j].At) })
+	return out
+}
+
+// LastAttempt returns your most recent go at one problem.
+func (s *Store) LastAttempt(ref string) (Attempt, bool) {
+	var last Attempt
+	found := false
+	for _, a := range s.attempts {
+		if a.Ref != ref {
+			continue
+		}
+		if !found || a.At.After(last.At) {
+			last, found = a, true
+		}
+	}
+	return last, found
 }
 
 // DefaultPath is where the CLI keeps history: $LCPRAC_HOME, else

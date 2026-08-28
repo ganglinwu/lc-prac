@@ -29,7 +29,7 @@ func problemFixture(t *testing.T) (*drill.Set, *progress.Store) {
 
 func TestProblemRowsFoldRefsAcrossDrills(t *testing.T) {
 	set, store := problemFixture(t)
-	rows := problemRows(set, store, "")
+	rows := problemRows(set, store, "", time.Now())
 	if len(rows) != 3 {
 		t.Fatalf("got %d rows, want 3 (a ref-less drill contributes nothing)", len(rows))
 	}
@@ -59,7 +59,7 @@ func TestProblemRowsRankWeakThenUntriedThenSolid(t *testing.T) {
 	store.Record("a", true, now)
 	store.Record("c", true, now) // LC 70 solid
 
-	rows := problemRows(set, store, "")
+	rows := problemRows(set, store, "", time.Now())
 	if rows[0].Ref != "LC 20 Valid Parentheses" {
 		t.Fatalf("first = %s, want the shaky problem", rows[0].Ref)
 	}
@@ -86,7 +86,7 @@ func TestProblemRowsPutMostBackedTopicFirst(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rows := problemRows(set, progress.New(""), "")
+	rows := problemRows(set, progress.New(""), "", time.Now())
 	if got := strings.Join(rows[0].Topics, ", "); got != "intervals, complexity" {
 		t.Errorf("topics = %q, want the two-drill topic first", got)
 	}
@@ -94,11 +94,11 @@ func TestProblemRowsPutMostBackedTopicFirst(t *testing.T) {
 
 func TestProblemRowsFilterByTopic(t *testing.T) {
 	set, store := problemFixture(t)
-	rows := problemRows(set, store, "dp")
+	rows := problemRows(set, store, "dp", time.Now())
 	if len(rows) != 1 || rows[0].Ref != "LC 70 Climbing Stairs" {
 		t.Fatalf("dp rows = %+v, want only LC 70", rows)
 	}
-	if got := problemRows(set, store, "graphs"); len(got) != 0 {
+	if got := problemRows(set, store, "graphs", time.Now()); len(got) != 0 {
 		t.Errorf("unknown topic gave %d rows", len(got))
 	}
 }
@@ -106,7 +106,7 @@ func TestProblemRowsFilterByTopic(t *testing.T) {
 func TestWriteProblemsTruncatesButTalliesEverything(t *testing.T) {
 	set, store := problemFixture(t)
 	store.Record("a", false, time.Now())
-	rows := problemRows(set, store, "")
+	rows := problemRows(set, store, "", time.Now())
 
 	var sb strings.Builder
 	writeProblems(&sb, rows, 1)
@@ -130,7 +130,7 @@ func TestBuiltinDeckNamesProblems(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rows := problemRows(set, progress.New(""), "")
+	rows := problemRows(set, progress.New(""), "", time.Now())
 	if len(rows) < 20 {
 		t.Errorf("builtin deck names only %d problems, want at least 20", len(rows))
 	}

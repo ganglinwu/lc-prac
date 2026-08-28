@@ -7,6 +7,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/ganglinwu/lc-prac/internal/drill"
 	"github.com/ganglinwu/lc-prac/internal/progress"
@@ -27,7 +28,7 @@ func cmdProblems(args []string) error {
 		return err
 	}
 	store := openStore()
-	rows := problemRows(set, store, *topic)
+	rows := problemRows(set, store, *topic, time.Now())
 	if len(rows) == 0 {
 		if *topic != "" {
 			fmt.Printf("no drill in %q names a problem.\n", *topic)
@@ -52,6 +53,10 @@ type problemRow struct {
 	Tried   int
 	Seen    int
 	Correct int
+	// Attempt is your last go at the real problem, and Fresh says that go was
+	// a solve recent enough that the problem is not worth redoing yet.
+	Attempt *progress.Attempt
+	Fresh   bool
 }
 
 // Accuracy is the percentage right across every attempt on the backing
@@ -66,6 +71,14 @@ func (p problemRow) Accuracy() int {
 // tier orders the list the way you would work through it: the patterns you
 // get wrong, then the ones you have never touched, then the settled ones.
 func (p problemRow) tier() int {
+	if p.Attempt != nil {
+		switch {
+		case p.Attempt.Result != progress.Passed:
+			return 0
+		case p.Fresh:
+			return 3
+		}
+	}
 	switch {
 	case p.Seen > 0 && p.Accuracy() < 100:
 		return 0
@@ -78,7 +91,7 @@ func (p problemRow) tier() int {
 
 // problemRows folds the deck's refs into one row per problem. A drill with no
 // refs contributes nothing: it is a pattern with no single problem behind it.
-func problemRows(set *drill.Set, store *progress.Store, topic string) []problemRow {
+func problemRows(set *drill.Set, store *progress.Store, topic string, now time.Time) []problemRow {
 	byRef := map[string]*problemRow{}
 	topics := map[string]map[string]int{}
 	for _, d := range set.Filter(topic, "", "") {
@@ -104,6 +117,10 @@ func problemRows(set *drill.Set, store *progress.Store, topic string) []problemR
 	}
 	out := make([]problemRow, 0, len(byRef))
 	for ref, row := range byRef {
+		if a, ok := store.LastAttempt(ref); ok {
+			row.Attempt = &a
+			row.Fresh = a.Result == progress.Passed && now.Sub(a.At) < staleAfter
+		}
 		for t := range topics[ref] {
 			row.Topics = append(row.Topics, t)
 		}
@@ -159,6 +176,9 @@ func writeProblems(w io.Writer, rows []problemRow, n int) {
 	}
 	fmt.Fprintf(w, "\n%d problem(s) behind the deck: %d shaky, %d not drilled yet, %d solid.\n",
 		len(rows), weak, untried, solid)
+	if logged := attemptedCount(rows); logged > 0 {
+		fmt.Fprintf(w, "%d of them you have attempted for real (`lcprac attempt` to log another).\n", logged)
+	}
 	if len(shown) > 0 {
 		top := shown[0]
 		fmt.Fprintf(w, "next up: attempt %s for real, or `lcprac drill %s` to warm up first.\n", top.Ref, warmUpFlag(top))
@@ -168,11 +188,19 @@ func writeProblems(w io.Writer, rows []problemRow, n int) {
 // problemMark says where you stand on a problem in words, since a bare
 // percentage cannot distinguish never-tried from never-right.
 func problemMark(p problemRow) string {
+	mark := fmt.Sprintf("%d%% over %d attempt(s)", p.Accuracy(), p.Seen)
 	if p.Seen == 0 {
-		return "not drilled yet"
+		mark = "not drilled yet"
 	}
-	return fmt.Sprintf("%d%% over %d attempt(s)", p.Accuracy(), p.Seen)
+	if p.Attempt != nil {
+		mark += fmt.Sprintf("; %s it %s", p.Attempt.Result, p.Attempt.At.Format("2 Jan"))
+	}
+	return mark
 }
+
+// staleAfter is how long a solved problem stays settled before it is worth
+// attempting again, matching the top of the drill scheduler's ladder.
+const staleAfter = 60 * 24 * time.Hour
 
 // warmUpFlag is the drill invocation that warms you up for a problem: by
 // number when the ref carries one, otherwise by its main topic.
@@ -181,4 +209,15 @@ func warmUpFlag(p problemRow) string {
 		return "-problem " + n
 	}
 	return "-topic " + p.Topics[0]
+}
+
+// attemptedCount is how many of the problems carry a logged real attempt.
+func attemptedCount(rows []problemRow) int {
+	n := 0
+	for _, p := range rows {
+		if p.Attempt != nil {
+			n++
+		}
+	}
+	return n
 }

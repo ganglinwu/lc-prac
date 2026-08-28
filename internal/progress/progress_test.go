@@ -481,3 +481,47 @@ func TestSolvedListsAndSurvivesSaveAndLoad(t *testing.T) {
 		t.Errorf("after reload Solution = %+v, %v", sol, ok)
 	}
 }
+
+func TestAttemptLogRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "progress.json")
+	s := New(path)
+	now := time.Date(2026, 3, 1, 9, 0, 0, 0, time.UTC)
+	s.LogAttempt("LC 56 Merge Intervals", Failed, "off by one", now)
+	s.LogAttempt("LC 56 Merge Intervals", Passed, "", now.Add(24*time.Hour))
+	s.LogAttempt("   ", Passed, "", now) // a failed lookup writes nothing
+	if got := len(s.Attempts()); got != 2 {
+		t.Fatalf("logged %d attempts, want 2", got)
+	}
+	if err := s.Save(); err != nil {
+		t.Fatal(err)
+	}
+	back, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	last, ok := back.LastAttempt("LC 56 Merge Intervals")
+	if !ok {
+		t.Fatal("attempt did not survive a reload")
+	}
+	if last.Result != Passed || !last.At.Equal(now.Add(24*time.Hour)) {
+		t.Errorf("last attempt = %+v, want the newer solve", last)
+	}
+	if got := back.Attempts()[0].Result; got != Passed {
+		t.Errorf("Attempts()[0] = %q, want the newest first", got)
+	}
+	if _, ok := back.LastAttempt("LC 1 Two Sum"); ok {
+		t.Error("LastAttempt found a problem that was never attempted")
+	}
+}
+
+func TestAttemptLogIsBounded(t *testing.T) {
+	s := New("")
+	now := time.Date(2026, 3, 1, 9, 0, 0, 0, time.UTC)
+	for i := 0; i < maxAttempts+10; i++ {
+		s.LogAttempt("LC 1 Two Sum", Passed, "", now.Add(time.Duration(i)*time.Hour))
+	}
+	if got := len(s.Attempts()); got != maxAttempts {
+		t.Errorf("kept %d attempts, want the log capped at %d", got, maxAttempts)
+	}
+}

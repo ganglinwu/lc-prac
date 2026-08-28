@@ -31,6 +31,7 @@ go run ./cmd/lcprac review               # reread the drills that keep beating y
 go run ./cmd/lcprac review -code         # your own saved code, next to the model answer
 go run ./cmd/lcprac pace                 # how long drills take you vs their estimate
 go run ./cmd/lcprac problems             # the real problems behind the deck, weakest first
+go run ./cmd/lcprac attempt 56 -failed   # log how a real problem actually went
 go run ./cmd/lcprac note <id> <words>    # keep your own wording on a drill
 go run ./cmd/lcprac add                  # write a drill of your own, one prompt at a time
 go run ./cmd/lcprac mine                 # your own drills and where they live
@@ -221,6 +222,28 @@ lcprac drill -problem "two sum"   # match on part of the title instead
 A bare number has to be the problem's own number, so `-problem 34` does not
 drag in LC 340. Unlike `-weak` and `-leech`, a problem nothing matches is an
 error rather than a random session, so a typo never quietly costs you a sitting.
+
+## Logging the real thing
+
+When you have actually sat down and attempted a problem, tell it how that went:
+
+```
+lcprac attempt 56 -failed sorted too late, merged into the wrong interval
+lcprac attempt "two sum"          # no outcome flag means solved
+lcprac attempt 20 -partial got it after peeking at the stack invariant
+lcprac attempt                    # everything you have attempted, newest first
+```
+
+The problem is matched the same way `-problem` matches it, by number or by
+part of the title, and an ambiguous title is an error rather than a guess. The
+outcome flag can go before or after the problem, and anything left over is your
+note on how it went.
+
+That log feeds straight back into `lcprac problems`: a problem you failed or
+half-solved jumps to the top of the list even when its drills look fine, and
+one you solved for real drops to the bottom for 60 days before it is worth
+redoing. A missed attempt prints the `lcprac drill -problem` line for the
+pattern behind it, so the next sitting is already chosen.
 
 ## Drill kinds
 
