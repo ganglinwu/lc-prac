@@ -251,3 +251,40 @@ func TestLoadWithoutSessionsIsEmpty(t *testing.T) {
 		t.Errorf("records = %d, want 1", s.Len())
 	}
 }
+
+func TestLeechNeedsThreeMissesAndNoRecovery(t *testing.T) {
+	cases := []struct {
+		name string
+		rec  Record
+		want bool
+	}{
+		{"two misses is bad luck", Record{Seen: 2, Correct: 0}, false},
+		{"three misses sticks", Record{Seen: 4, Correct: 1}, true},
+		{"one clean solve since is not enough", Record{Seen: 4, Correct: 1, Streak: 1}, true},
+		{"two clean solves since clears it", Record{Seen: 5, Correct: 2, Streak: 2}, false},
+	}
+	for _, c := range cases {
+		if got := c.rec.IsLeech(); got != c.want {
+			t.Errorf("%s: IsLeech = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestLeechesAreWorstFirst(t *testing.T) {
+	now := time.Now()
+	s := New("")
+	for i := 0; i < 3; i++ {
+		s.Record("mild", false, now)
+	}
+	for i := 0; i < 5; i++ {
+		s.Record("awful", false, now)
+	}
+	s.Record("fine", true, now)
+	got := s.Leeches()
+	if len(got) != 2 {
+		t.Fatalf("got %d leeches, want 2: %+v", len(got), got)
+	}
+	if got[0].DrillID != "awful" || got[1].DrillID != "mild" {
+		t.Errorf("order = %s, %s; want awful, mild", got[0].DrillID, got[1].DrillID)
+	}
+}

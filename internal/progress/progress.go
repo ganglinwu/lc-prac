@@ -286,3 +286,33 @@ func (s *Store) DayStreak(now time.Time) int {
 }
 
 func dayKey(t time.Time) string { return t.Format("2006-01-02") }
+
+// LeechMisses is how many misses make a drill a leech: three wrong answers is
+// past bad luck and into "this one is not sticking".
+const LeechMisses = 3
+
+// leechRecovered is the streak at which a leech is considered fixed: two clean
+// solves in a row since, so it is no longer worth putting on a review list.
+const leechRecovered = 2
+
+// Misses is how many attempts on this drill went wrong.
+func (r Record) Misses() int { return r.Seen - r.Correct }
+
+// IsLeech reports whether a drill keeps beating you: missed at least
+// LeechMisses times and not yet solved cleanly twice in a row since.
+func (r Record) IsLeech() bool {
+	return r.Misses() >= LeechMisses && r.Streak < leechRecovered
+}
+
+// Leeches returns the drills you keep missing, worst first, then by id so the
+// order is stable across runs.
+func (s *Store) Leeches() []Record {
+	var out []Record
+	for _, r := range s.Records() {
+		if r.IsLeech() {
+			out = append(out, r)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Misses() > out[j].Misses() })
+	return out
+}

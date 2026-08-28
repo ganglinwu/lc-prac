@@ -39,6 +39,8 @@ func run(args []string) error {
 		return cmdStats(args)
 	case "mine":
 		return cmdMine(args)
+	case "review":
+		return cmdReview(args)
 	case "help", "-h", "--help":
 		usage()
 		return nil
@@ -63,6 +65,9 @@ func usage() {
   lcprac stats [-reset]
       Show what you have practised, your streak and recent sessions, and
       what is due to come back.
+  lcprac review [-n 5] [-topic X] [-all] [id...]
+      Reread the drills you keep missing, answers shown. Name ids to read
+      those instead; -all widens it to everything you have ever missed.
   lcprac mine [-init]
       Show where your own drill files live and what they add. -init writes a
       commented example you can copy.
@@ -339,6 +344,9 @@ func cmdStats(args []string) error {
 	fmt.Printf("\ntotal: %s over %d attempts, %d of %d drills due now\n", pct(correct, seen), seen, due, set.Len())
 	if assisted > 0 {
 		fmt.Printf("%d of those correct answers needed a hint.\n", assisted)
+	}
+	if n := len(store.Leeches()); n > 0 {
+		fmt.Printf("%d drill(s) keep beating you: lcprac review\n", n)
 	}
 	if next := focus(stats); next != "" {
 		fmt.Printf("next up: lcprac drill -topic %s\n", next)

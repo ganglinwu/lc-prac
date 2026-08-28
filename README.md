@@ -24,6 +24,7 @@ go run ./cmd/lcprac drill -tries 1       # code drills: one shot, then the answe
 go run ./cmd/lcprac list                 # every drill, no session
 go run ./cmd/lcprac topics               # topics and their drill counts
 go run ./cmd/lcprac stats                # accuracy, streak, recent sessions, what is due
+go run ./cmd/lcprac review               # reread the drills that keep beating you
 go run ./cmd/lcprac mine                 # your own drills and where they live
 ```
 
@@ -101,6 +102,21 @@ History lives in `$LCPRAC_HOME/progress.json` if that is set, otherwise
 `-shuffle` picks at random and ignores your history, `-nosave` runs a session
 without recording it, `-noretry` drops the second pass, `-nolimit` removes the
 time ceiling.
+
+## Review: the drills that keep beating you
+
+A drill you have missed three times is not bad luck, it is something that has
+not stuck. `lcprac review` prints those with their answers open, so you can
+read them instead of being quizzed again. A drill leaves the list once you
+have solved it cleanly twice in a row, and `stats` says how many are on it.
+
+```
+lcprac review                 # up to 5, worst first
+lcprac review -n 0            # all of them
+lcprac review -topic dp       # only one topic
+lcprac review -all            # everything you have ever missed once
+lcprac review hashmap-two-sum-code # any drill by id, history or not
+```
 
 ## Drill kinds
 
