@@ -638,3 +638,39 @@ func TestCodeDrillKeepsItsTriesWithoutATimeLimit(t *testing.T) {
 		t.Fatalf("-nolimit should keep every try, got %d compiles", *calls)
 	}
 }
+
+// OnResult exists so the caller can persist a drill the moment it is graded.
+// It must fire per first-pass drill, in order, and never for the second pass,
+// whose retries are unscored reinforcement.
+func TestOnResultFiresPerFirstPassDrill(t *testing.T) {
+	var out strings.Builder
+	r := New(strings.NewReader("1\n2\n2\n"), &out)
+	r.RetryMisses = true
+	tick := 0
+	r.Now = func() time.Time {
+		tick++
+		return time.Unix(int64(tick), 0)
+	}
+	var seen []Result
+	r.OnResult = func(res Result) { seen = append(seen, res) }
+
+	first, second := choiceDrill(), complexityDrill()
+	second.ID = "second"
+	second.Kind, second.Choices, second.Answer = drill.KindChoice, []string{"no", "yes"}, "yes"
+	rep, err := r.Run(session.Session{Drills: []drill.Drill{first, second}, BudgetMinutes: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.Retries) != 1 {
+		t.Fatalf("Retries = %d, want the missed drill re-asked once", len(rep.Retries))
+	}
+	if len(seen) != 2 {
+		t.Fatalf("OnResult fired %d times, want one per first-pass drill", len(seen))
+	}
+	if seen[0].Drill.ID != first.ID || seen[0].Correct {
+		t.Errorf("first callback = %+v, want the missed drill %q", seen[0], first.ID)
+	}
+	if seen[1].Drill.ID != second.ID || !seen[1].Correct {
+		t.Errorf("second callback = %+v, want a correct %q", seen[1], second.ID)
+	}
+}

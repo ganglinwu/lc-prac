@@ -98,6 +98,12 @@ attempts on record, and before that the topic with the most drills you have
 never tried. The log keeps the most recent 200 sessions and `stats -reset`
 clears it along with the drill history.
 
+Every drill is written to history as soon as it is graded, not at the end of
+the sitting, so a session you abandon halfway keeps what you already did.
+Ctrl-C stops the sitting cleanly: it logs the partial session (so it still
+counts towards the streak), prints what was saved, and exits. Quitting with
+Ctrl-D at a prompt ends the session the same way but still shows the summary.
+
 History lives in `$LCPRAC_HOME/progress.json` if that is set, otherwise
 `$XDG_DATA_HOME/lcprac/` or `~/.local/share/lcprac/`. Two flags opt out:
 `-shuffle` picks at random and ignores your history, `-nosave` runs a session

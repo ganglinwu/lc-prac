@@ -81,6 +81,9 @@ func usage() {
   the builtin deck. They are added to the deck automatically; one that reuses a
   builtin id replaces it. Pass -builtin to drill or list to ignore them.
 
+  answers are saved as you go, so stopping halfway keeps what you did. Ctrl-C
+  ends the sitting cleanly and still logs it towards your streak.
+
   press h at any prompt for a hint on drills that carry one. Solving with a
   hint still counts, but the drill keeps its place in the schedule.
 
@@ -152,6 +155,12 @@ func cmdDrill(args []string) error {
 	run.RetryMisses = !*noretry
 	run.NoTimeLimit = *nolimit
 	run.CodeAttempts = *tries
+	var live *liveProgress
+	if !*nosave {
+		live = newLive(store, os.Stdout, time.Now)
+		run.OnResult = live.record
+		defer catchInterrupt(live)()
+	}
 	rep, err := run.Run(s)
 	if err != nil {
 		return err
@@ -159,7 +168,7 @@ func cmdDrill(args []string) error {
 	if *nosave {
 		return nil
 	}
-	return saveResults(store, rep)
+	return saveResults(live, rep)
 }
 
 // openStore loads history, degrading to an unsaved in-memory store rather than
@@ -191,54 +200,25 @@ func outcome(res runner.Result) progress.Outcome {
 	}
 }
 
-// saveResults folds the graded drills into history and reports what comes back
-// when, so the scheduling is visible instead of implicit.
-func saveResults(store *progress.Store, rep runner.Report) error {
-	now := time.Now()
-	recorded := 0
-	for _, res := range rep.Results {
-		if res.Skipped {
-			continue
-		}
-		store.RecordOutcome(res.Drill.ID, outcome(res), now)
-		recorded++
-	}
-	if recorded == 0 {
+// saveResults closes out a finished session: the drills themselves were
+// already recorded as they were answered, so this logs the sitting and reports
+// what comes back when, making the scheduling visible instead of implicit.
+func saveResults(live *liveProgress, rep runner.Report) error {
+	live.mu.Lock()
+	defer live.mu.Unlock()
+	if live.recorded == 0 {
 		return nil
 	}
-	soon := 0
-	for _, res := range rep.Results {
-		if !res.Skipped && !res.Correct {
-			soon++
-		}
+	live.logSession(rep.Elapsed)
+	fmt.Fprintf(live.out, "\nsaved %d results to %s\n", live.recorded, live.store.Path())
+	if n := live.store.DayStreak(live.now()); n > 1 {
+		fmt.Fprintf(live.out, "practice streak: %d days.\n", n)
 	}
-	hinted := 0
-	for _, res := range rep.Results {
-		if !res.Skipped && res.Correct && res.Hints > 0 {
-			hinted++
-		}
+	if live.hinted > 0 {
+		fmt.Fprintf(live.out, "%d solved with a hint, so they hold their place instead of climbing the ladder.\n", live.hinted)
 	}
-	correct, _ := rep.Score()
-	store.AddSession(progress.Session{
-		At:        now,
-		Minutes:   wholeMinutes(rep.Elapsed),
-		Attempted: recorded,
-		Correct:   correct,
-		Assisted:  hinted,
-		Skipped:   len(rep.Results) - recorded,
-	})
-	if err := store.Save(); err != nil {
-		return err
-	}
-	fmt.Printf("\nsaved %d results to %s\n", recorded, store.Path())
-	if n := store.DayStreak(now); n > 1 {
-		fmt.Printf("practice streak: %d days.\n", n)
-	}
-	if hinted > 0 {
-		fmt.Printf("%d solved with a hint, so they hold their place instead of climbing the ladder.\n", hinted)
-	}
-	if soon > 0 {
-		fmt.Printf("%d missed drills come back in ~10 min, ahead of everything else.\n", soon)
+	if live.missed > 0 {
+		fmt.Fprintf(live.out, "%d missed drills come back in ~10 min, ahead of everything else.\n", live.missed)
 	}
 	return nil
 }

@@ -99,6 +99,10 @@ type Runner struct {
 	// CodeAttempts caps the tries allowed on one code drill before the
 	// working version is revealed. Zero means defaultCodeAttempts.
 	CodeAttempts int
+	// OnResult, if set, is called with each first-pass result as soon as it
+	// is graded, so history survives a session that never reaches its end.
+	// Second-pass retries are unscored and never reported here.
+	OnResult func(Result)
 }
 
 // New builds a Runner over the given streams.
@@ -163,6 +167,9 @@ func (r *Runner) Run(s session.Session) (Report, error) {
 			return rep, err
 		}
 		rep.Results = append(rep.Results, res)
+		if r.OnResult != nil {
+			r.OnResult(res)
+		}
 	}
 	if err := r.retryPass(&rep, deadline); err != nil {
 		return rep, err
