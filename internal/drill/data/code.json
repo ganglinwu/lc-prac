@@ -1,0 +1,58 @@
+[
+  {
+    "id": "hashmap-two-sum-code",
+    "title": "Two sum with a seen-map",
+    "kind": "code",
+    "topic": "hashmap",
+    "difficulty": "easy",
+    "est_minutes": 5,
+    "prompt": "Implement twoSum(nums []int, target int) []int returning the two indices whose values add to target. Exactly one answer exists. One pass, O(n).",
+    "code": {
+      "stub": "func twoSum(nums []int, target int) []int {\n\t// your code here\n\treturn nil\n}",
+      "tests": "import (\n\t\"sort\"\n\t\"testing\"\n)\n\nfunc TestTwoSum(t *testing.T) {\n\tcases := []struct {\n\t\tnums   []int\n\t\ttarget int\n\t\twant   []int\n\t}{\n\t\t{[]int{2, 7, 11, 15}, 9, []int{0, 1}},\n\t\t{[]int{3, 2, 4}, 6, []int{1, 2}},\n\t\t{[]int{3, 3}, 6, []int{0, 1}},\n\t\t{[]int{-1, -2, -3, -4, -5}, -8, []int{2, 4}},\n\t}\n\tfor _, c := range cases {\n\t\tgot := twoSum(c.nums, c.target)\n\t\tif len(got) != 2 {\n\t\t\tt.Fatalf(\"twoSum(%v, %d) = %v, want two indices\", c.nums, c.target, got)\n\t\t}\n\t\tsort.Ints(got)\n\t\tif got[0] != c.want[0] || got[1] != c.want[1] {\n\t\t\tt.Fatalf(\"twoSum(%v, %d) = %v, want %v\", c.nums, c.target, got, c.want)\n\t\t}\n\t}\n}"
+    },
+    "answer": "func twoSum(nums []int, target int) []int {\n\tseen := make(map[int]int, len(nums))\n\tfor i, v := range nums {\n\t\tif j, ok := seen[target-v]; ok {\n\t\t\treturn []int{j, i}\n\t\t}\n\t\tseen[v] = i\n\t}\n\treturn nil\n}",
+    "explanation": "Store value -> index as you go and look for the complement before inserting. Checking first is what stops an element pairing with itself, and it means you never need a second pass.",
+    "refs": [
+      "LC 1 Two Sum"
+    ]
+  },
+  {
+    "id": "binary-search-lower-bound-code",
+    "title": "Lower bound with half-open bounds",
+    "kind": "code",
+    "topic": "binary-search",
+    "difficulty": "medium",
+    "est_minutes": 6,
+    "prompt": "Implement lowerBound(nums []int, target int) int on a sorted slice: the index of the first element >= target, or len(nums) if there is none. No use of the sort package.",
+    "code": {
+      "stub": "func lowerBound(nums []int, target int) int {\n\t// your code here\n\treturn 0\n}",
+      "tests": "import \"testing\"\n\nfunc TestLowerBound(t *testing.T) {\n\tnums := []int{1, 3, 3, 3, 5, 8}\n\tcases := []struct{ target, want int }{\n\t\t{0, 0},\n\t\t{1, 0},\n\t\t{2, 1},\n\t\t{3, 1},\n\t\t{4, 4},\n\t\t{8, 5},\n\t\t{9, 6},\n\t}\n\tfor _, c := range cases {\n\t\tif got := lowerBound(nums, c.target); got != c.want {\n\t\t\tt.Fatalf(\"lowerBound(%v, %d) = %d, want %d\", nums, c.target, got, c.want)\n\t\t}\n\t}\n\tif got := lowerBound(nil, 1); got != 0 {\n\t\tt.Fatalf(\"lowerBound(nil, 1) = %d, want 0\", got)\n\t}\n}"
+    },
+    "answer": "func lowerBound(nums []int, target int) int {\n\tlo, hi := 0, len(nums)\n\tfor lo < hi {\n\t\tmid := lo + (hi-lo)/2\n\t\tif nums[mid] < target {\n\t\t\tlo = mid + 1\n\t\t} else {\n\t\t\thi = mid\n\t\t}\n\t}\n\treturn lo\n}",
+    "explanation": "Half-open [lo, hi) with hi starting at len(nums) is what lets the answer be len(nums) without a special case. The invariant is that everything below lo is < target and everything from hi up is >= target, so lo is the answer when they meet.",
+    "refs": [
+      "LC 35 Search Insert Position",
+      "LC 34 Find First and Last Position"
+    ]
+  },
+  {
+    "id": "two-pointers-palindrome-code",
+    "title": "Two pointers that skip junk",
+    "kind": "code",
+    "topic": "two-pointers",
+    "difficulty": "easy",
+    "est_minutes": 5,
+    "prompt": "Implement isPalindrome(s string) bool, considering only letters and digits and ignoring case. Two pointers, O(1) extra space (no cleaned copy of the string).",
+    "code": {
+      "preamble": "import \"unicode\"\n\nfunc alnum(b byte) bool {\n\treturn unicode.IsLetter(rune(b)) || unicode.IsDigit(rune(b))\n}\n\nfunc lower(b byte) byte {\n\tif b >= 'A' && b <= 'Z' {\n\t\treturn b + 32\n\t}\n\treturn b\n}",
+      "stub": "// alnum(b byte) bool and lower(b byte) byte are provided.\nfunc isPalindrome(s string) bool {\n\t// your code here\n\treturn false\n}",
+      "tests": "import \"testing\"\n\nfunc TestIsPalindrome(t *testing.T) {\n\tcases := []struct {\n\t\ts    string\n\t\twant bool\n\t}{\n\t\t{\"A man, a plan, a canal: Panama\", true},\n\t\t{\"race a car\", false},\n\t\t{\"\", true},\n\t\t{\" \", true},\n\t\t{\".,\", true},\n\t\t{\"0P\", false},\n\t\t{\"aa\", true},\n\t\t{\"ab\", false},\n\t}\n\tfor _, c := range cases {\n\t\tif got := isPalindrome(c.s); got != c.want {\n\t\t\tt.Fatalf(\"isPalindrome(%q) = %v, want %v\", c.s, got, c.want)\n\t\t}\n\t}\n}"
+    },
+    "answer": "func isPalindrome(s string) bool {\n\ti, j := 0, len(s)-1\n\tfor i < j {\n\t\tfor i < j && !alnum(s[i]) {\n\t\t\ti++\n\t\t}\n\t\tfor i < j && !alnum(s[j]) {\n\t\t\tj--\n\t\t}\n\t\tif lower(s[i]) != lower(s[j]) {\n\t\t\treturn false\n\t\t}\n\t\ti++\n\t\tj--\n\t}\n\treturn true\n}",
+    "explanation": "The skip loops need the i < j guard too, otherwise an all-punctuation string walks a pointer off the end. Comparing in place beats building a filtered copy: same time, no allocation.",
+    "refs": [
+      "LC 125 Valid Palindrome"
+    ]
+  }
+]

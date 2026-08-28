@@ -58,7 +58,10 @@ func usage() {
   lcprac stats [-reset]
       Show what you have practised and what is due to come back.
 
-  kinds:        recall, choice, complexity, snippet
+  code drills compile what you write and run real tests against it: type the
+  function and end with a line ".", or press e to open $EDITOR.
+
+  kinds:        recall, choice, complexity, snippet, code
   difficulties: easy, medium
 `)
 }
@@ -66,7 +69,7 @@ func usage() {
 // drillFlags registers the filters shared by drill and list.
 func drillFlags(fs *flag.FlagSet) (topic, kind, diff *string) {
 	topic = fs.String("topic", "", "only this topic")
-	kind = fs.String("kind", "", "only this kind (recall, choice, complexity, snippet)")
+	kind = fs.String("kind", "", "only this kind (recall, choice, complexity, snippet, code)")
 	diff = fs.String("diff", "", "only this difficulty (easy, medium)")
 	return topic, kind, diff
 }

@@ -1,10 +1,12 @@
 package runner
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/ganglinwu/lc-prac/internal/codecheck"
 	"github.com/ganglinwu/lc-prac/internal/drill"
 	"github.com/ganglinwu/lc-prac/internal/session"
 )
@@ -185,5 +187,140 @@ func TestSkippedDrillsAreNotRetried(t *testing.T) {
 	}
 	if strings.Contains(out, "second pass") {
 		t.Error("skips should not trigger a second pass")
+	}
+}
+
+func codeDrill() drill.Drill {
+	return drill.Drill{
+		ID: "k", Title: "Add", Kind: drill.KindCode, Topic: "hashmap",
+		Difficulty: drill.Easy, EstMinutes: 5, Prompt: "write add",
+		Answer: "func add(a, b int) int { return a + b }", Explanation: "sum",
+		Code: &drill.CodeSpec{
+			Stub:     "func add(a, b int) int { return 0 }",
+			Preamble: "type unused struct{}",
+			Tests:    "import \"testing\"\n\nfunc TestAdd(t *testing.T) {}",
+		},
+	}
+}
+
+// runCode drives a code drill with a stubbed grader so the tests never shell
+// out to the toolchain; codecheck's own tests cover the real compile.
+func runCode(t *testing.T, input string, grade func(context.Context, codecheck.Program) (codecheck.Result, error), editor func(string) (string, error), ds ...drill.Drill) (Report, string) {
+	t.Helper()
+	var out strings.Builder
+	r := New(strings.NewReader(input), &out)
+	r.RetryMisses = false
+	r.Grade = grade
+	r.Editor = editor
+	tick := 0
+	r.Now = func() time.Time {
+		tick++
+		return time.Unix(int64(tick), 0)
+	}
+	rep, err := r.Run(session.Session{Drills: ds, BudgetMinutes: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return rep, out.String()
+}
+
+func TestCodeDrillGradesTypedSourceUpToTheMarker(t *testing.T) {
+	var got codecheck.Program
+	pass := func(_ context.Context, p codecheck.Program) (codecheck.Result, error) {
+		got = p
+		return codecheck.Result{Passed: true}, nil
+	}
+	input := "func add(a, b int) int {\n\treturn a + b\n}\n.\n"
+	rep, out := runCode(t, input, pass, nil, codeDrill())
+
+	if correct, attempted := rep.Score(); correct != 1 || attempted != 1 {
+		t.Fatalf("Score() = %d/%d, want 1/1", correct, attempted)
+	}
+	if got.Source != "func add(a, b int) int {\n\treturn a + b\n}" {
+		t.Fatalf("graded source = %q", got.Source)
+	}
+	if got.Preamble != "type unused struct{}" || got.Tests == "" {
+		t.Fatalf("drill's preamble and tests should reach the grader: %+v", got)
+	}
+	if !strings.Contains(out, "all tests pass") {
+		t.Errorf("a pass should be announced, got:\n%s", out)
+	}
+}
+
+func TestCodeDrillFailureShowsOutputAndModelAnswer(t *testing.T) {
+	fail := func(context.Context, codecheck.Program) (codecheck.Result, error) {
+		return codecheck.Result{Output: "add_test.go:9: add(2,3) = 0"}, nil
+	}
+	rep, out := runCode(t, "func add(a, b int) int { return 0 }\n.\n", fail, nil, codeDrill())
+	if correct, _ := rep.Score(); correct != 0 {
+		t.Fatalf("failing code should score 0, got %d", correct)
+	}
+	if !strings.Contains(out, "add(2,3) = 0") {
+		t.Error("the test failure output should be shown")
+	}
+	if !strings.Contains(out, "return a + b") {
+		t.Error("a failed code drill should reveal the working version")
+	}
+}
+
+func TestCodeDrillUsesEditorOnE(t *testing.T) {
+	var seeded string
+	editor := func(initial string) (string, error) {
+		seeded = initial
+		return "func add(a, b int) int { return a + b }", nil
+	}
+	var got codecheck.Program
+	pass := func(_ context.Context, p codecheck.Program) (codecheck.Result, error) {
+		got = p
+		return codecheck.Result{Passed: true}, nil
+	}
+	rep, _ := runCode(t, "e\n", pass, editor, codeDrill())
+	if seeded != codeDrill().Code.Stub {
+		t.Fatalf("editor should open on the stub, got %q", seeded)
+	}
+	if !strings.Contains(got.Source, "a + b") {
+		t.Fatalf("edited source should be graded, got %q", got.Source)
+	}
+	if correct, _ := rep.Score(); correct != 1 {
+		t.Fatal("editor path should score like the inline path")
+	}
+}
+
+func TestCodeDrillFallsBackToSelfGradingWithoutToolchain(t *testing.T) {
+	rep, out := runCode(t, "\ny\n", nil, nil, codeDrill())
+	if correct, attempted := rep.Score(); correct != 1 || attempted != 1 {
+		t.Fatalf("Score() = %d/%d, want the self-graded verdict to count", correct, attempted)
+	}
+	if !strings.Contains(out, "Did you have it?") {
+		t.Errorf("without a grader the drill should reveal and ask, got:\n%s", out)
+	}
+}
+
+func TestCodeDrillSkipDoesNotGrade(t *testing.T) {
+	graded := false
+	grade := func(context.Context, codecheck.Program) (codecheck.Result, error) {
+		graded = true
+		return codecheck.Result{}, nil
+	}
+	rep, _ := runCode(t, "s\n", grade, nil, codeDrill())
+	if graded {
+		t.Error("skipping should not compile anything")
+	}
+	if !rep.Results[0].Skipped {
+		t.Error("code drill skip should be recorded as a skip")
+	}
+}
+
+func TestCodeDrillEndsCleanlyWhenInputRunsOut(t *testing.T) {
+	pass := func(context.Context, codecheck.Program) (codecheck.Result, error) {
+		return codecheck.Result{Passed: true}, nil
+	}
+	// No end marker: Ctrl-D is a legitimate way to finish typing.
+	rep, out := runCode(t, "func add(a, b int) int { return a + b }\n", pass, nil, codeDrill())
+	if len(rep.Results) != 1 || !rep.Results[0].Correct {
+		t.Fatalf("EOF should still grade what was typed, got %+v", rep.Results)
+	}
+	if !strings.Contains(out, "correct in") {
+		t.Error("summary should still print")
 	}
 }

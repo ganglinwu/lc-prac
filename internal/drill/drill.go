@@ -21,6 +21,8 @@ const (
 	KindComplexity Kind = "complexity"
 	// KindSnippet asks for a few lines of code; self-graded against a model answer.
 	KindSnippet Kind = "snippet"
+	// KindCode asks for a working function, graded by compiling and running it.
+	KindCode Kind = "code"
 )
 
 // Difficulty mirrors LeetCode's scale so drills can be tied back to problems.
@@ -30,6 +32,20 @@ const (
 	Easy   Difficulty = "easy"
 	Medium Difficulty = "medium"
 )
+
+// CodeSpec is the machine-checkable half of a code drill: what the user starts
+// from, what compiles alongside their code, and the test file that grades it.
+type CodeSpec struct {
+	// Stub is the starting point the user edits, typically an empty function.
+	Stub string `json:"stub"`
+	// Preamble is support code (helper types, imports) compiled alongside the
+	// user's source but not shown as theirs to write.
+	Preamble string `json:"preamble,omitempty"`
+	// Tests is a complete Go test file body: everything after the package
+	// clause, including its own imports. The drill author owns it entirely so
+	// no import juggling is needed at generation time.
+	Tests string `json:"tests"`
+}
 
 // Drill is a single practice unit.
 type Drill struct {
@@ -44,6 +60,7 @@ type Drill struct {
 	Answer      string     `json:"answer"`
 	Explanation string     `json:"explanation"`
 	Refs        []string   `json:"refs,omitempty"`
+	Code        *CodeSpec  `json:"code,omitempty"`
 }
 
 // SelfGraded reports whether the user grades their own answer. Free-form kinds
@@ -61,7 +78,7 @@ func (d Drill) Validate() error {
 		return fmt.Errorf("drill %s: missing title", d.ID)
 	}
 	switch d.Kind {
-	case KindRecall, KindChoice, KindComplexity, KindSnippet:
+	case KindRecall, KindChoice, KindComplexity, KindSnippet, KindCode:
 	default:
 		return fmt.Errorf("drill %s: unknown kind %q", d.ID, d.Kind)
 	}
@@ -95,6 +112,19 @@ func (d Drill) Validate() error {
 	}
 	if d.Kind != KindChoice && len(d.Choices) > 0 {
 		return fmt.Errorf("drill %s: choices only allowed on kind %q", d.ID, KindChoice)
+	}
+	if d.Kind == KindCode {
+		if d.Code == nil {
+			return fmt.Errorf("drill %s: code kind needs a code block", d.ID)
+		}
+		if strings.TrimSpace(d.Code.Stub) == "" {
+			return fmt.Errorf("drill %s: code block needs a stub", d.ID)
+		}
+		if strings.TrimSpace(d.Code.Tests) == "" {
+			return fmt.Errorf("drill %s: code block needs tests", d.ID)
+		}
+	} else if d.Code != nil {
+		return fmt.Errorf("drill %s: code block only allowed on kind %q", d.ID, KindCode)
 	}
 	return nil
 }

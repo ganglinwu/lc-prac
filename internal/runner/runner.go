@@ -3,16 +3,25 @@ package runner
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
 
+	"github.com/ganglinwu/lc-prac/internal/codecheck"
 	"github.com/ganglinwu/lc-prac/internal/drill"
 	"github.com/ganglinwu/lc-prac/internal/session"
 )
+
+// endMarker terminates inline code entry. A lone dot is not valid Go, so it can
+// never collide with a line the user meant to keep.
+const endMarker = "."
 
 // Result records how one drill went.
 type Result struct {
@@ -64,13 +73,31 @@ type Runner struct {
 	Now func() time.Time
 	// RetryMisses re-asks missed drills once at the end of the session.
 	RetryMisses bool
+	// Grade compiles and runs a code drill. Nil means no Go toolchain is
+	// available, so code drills fall back to self-grading.
+	Grade func(context.Context, codecheck.Program) (codecheck.Result, error)
+	// Editor composes code in an external editor. Nil disables the [e] option.
+	Editor func(initial string) (string, error)
 }
 
 // New builds a Runner over the given streams.
 func New(in io.Reader, out io.Writer) *Runner {
 	sc := bufio.NewScanner(in)
 	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	return &Runner{in: sc, out: out, Now: time.Now, RetryMisses: true}
+	r := &Runner{in: sc, out: out, Now: time.Now, RetryMisses: true, Editor: EditInEditor}
+	if codecheck.Available() {
+		r.Grade = codecheck.Run
+	}
+	return r
+}
+
+// selfGrades reports whether this runner will ask the user to grade the drill.
+// A code drill is machine-graded only when a toolchain was found.
+func (r *Runner) selfGrades(d drill.Drill) bool {
+	if d.Kind == drill.KindCode {
+		return r.Grade == nil || d.Code == nil
+	}
+	return d.SelfGraded()
 }
 
 // Run walks the session, returning once every drill is answered or the input
@@ -129,9 +156,18 @@ func (r *Runner) runOne(label string, d drill.Drill) (Result, error) {
 		fmt.Fprintf(r.out, "  %d) %s\n", i+1, c)
 	}
 
-	if d.SelfGraded() {
+	machineGraded := d.Kind == drill.KindCode && !r.selfGrades(d)
+	switch {
+	case machineGraded:
+		fmt.Fprintf(r.out, "\n%s\n", d.Code.Stub)
+		if r.Editor != nil {
+			fmt.Fprintf(r.out, "\ne to open $EDITOR, or type your code and end with a line \"%s\" (s to skip): ", endMarker)
+		} else {
+			fmt.Fprintf(r.out, "\nType your code and end with a line \"%s\" (s to skip): ", endMarker)
+		}
+	case r.selfGrades(d):
 		fmt.Fprintf(r.out, "\nThink it through, then press enter to reveal (s to skip): ")
-	} else {
+	default:
 		fmt.Fprintf(r.out, "\nYour answer (s to skip): ")
 	}
 	input, err := r.readLine()
@@ -147,7 +183,14 @@ func (r *Runner) runOne(label string, d drill.Drill) (Result, error) {
 		return res, nil
 	}
 
-	if d.SelfGraded() {
+	if machineGraded {
+		correct, err := r.gradeCode(d, input)
+		if err != nil {
+			return Result{}, err
+		}
+		res.Correct = correct
+		fmt.Fprintf(r.out, "\n%s\n", d.Explanation)
+	} else if r.selfGrades(d) {
 		fmt.Fprintf(r.out, "\nanswer: %s\n\n%s\n", d.Answer, d.Explanation)
 		fmt.Fprintf(r.out, "\nDid you have it? [y/N]: ")
 		verdict, err := r.readLine()
@@ -169,6 +212,95 @@ func (r *Runner) runOne(label string, d drill.Drill) (Result, error) {
 	}
 	res.Elapsed = r.Now().Sub(started)
 	return res, nil
+}
+
+// gradeCode collects the user's source, compiles it against the drill's tests
+// and reports whether it passed. first is the line already consumed by runOne:
+// "e" opens the editor, anything else is the first line of inline entry.
+func (r *Runner) gradeCode(d drill.Drill, first string) (bool, error) {
+	var src string
+	if strings.EqualFold(strings.TrimSpace(first), "e") && r.Editor != nil {
+		edited, err := r.Editor(d.Code.Stub)
+		if err != nil {
+			fmt.Fprintf(r.out, "\neditor failed: %v\n", err)
+			return false, nil
+		}
+		src = edited
+	} else {
+		rest, err := r.readUntilMarker()
+		if err != nil && err != io.EOF {
+			return false, err
+		}
+		src = strings.Join(append([]string{first}, rest...), "\n")
+	}
+	if strings.TrimSpace(src) == "" {
+		fmt.Fprintln(r.out, "\nnothing to compile.")
+		return false, nil
+	}
+
+	fmt.Fprintln(r.out, "\ncompiling and running the tests...")
+	res, err := r.Grade(context.Background(), codecheck.Program{
+		Preamble: d.Code.Preamble,
+		Source:   src,
+		Tests:    d.Code.Tests,
+	})
+	if err != nil {
+		fmt.Fprintf(r.out, "\ncould not grade: %v\n", err)
+		return false, nil
+	}
+	if res.Passed {
+		fmt.Fprintln(r.out, "\nall tests pass.")
+		return true, nil
+	}
+	if res.TimedOut {
+		fmt.Fprintln(r.out, "\ntimed out, so something never terminates.")
+	}
+	fmt.Fprintf(r.out, "\ntests failed:\n%s\n\nworking version:\n%s\n", res.Output, d.Answer)
+	return false, nil
+}
+
+// readUntilMarker consumes lines up to the end marker, returning what it read
+// even when the stream ends first (Ctrl-D is a legitimate way to finish).
+func (r *Runner) readUntilMarker() ([]string, error) {
+	var lines []string
+	for {
+		line, err := r.readLine()
+		if err != nil {
+			return lines, err
+		}
+		if strings.TrimSpace(line) == endMarker {
+			return lines, nil
+		}
+		lines = append(lines, line)
+	}
+}
+
+// EditInEditor opens $EDITOR on a temp file seeded with the stub and returns
+// what was saved.
+func EditInEditor(initial string) (string, error) {
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		editor = "vi"
+	}
+	dir, err := os.MkdirTemp("", "lcprac-edit-")
+	if err != nil {
+		return "", err
+	}
+	defer os.RemoveAll(dir)
+	path := filepath.Join(dir, "solution.go")
+	if err := os.WriteFile(path, []byte(initial+"\n"), 0o600); err != nil {
+		return "", err
+	}
+	cmd := exec.Command(editor, path)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("%s: %w", editor, err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
 
 func (r *Runner) printSummary(rep Report) {

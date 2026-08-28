@@ -64,9 +64,31 @@ without recording it, `-noretry` drops the second pass.
 | `choice` | the CLI | multiple choice |
 | `complexity` | the CLI | "what is the big-O?", compared loosely |
 | `snippet` | you | write a few lines, compare to a model answer |
+| `code` | the Go toolchain | write a working function, real tests run against it |
 
 Free-form kinds are self-graded on purpose: reading the model answer and
 deciding whether you had it is the actual practice.
+
+## Code drills
+
+A `code` drill is the one kind that is not taken on trust. You get a stub, you
+write the function, and `lcprac` builds a throwaway module around it and runs
+the drill's test file:
+
+```
+e to open $EDITOR, or type your code and end with a line "." (s to skip):
+```
+
+Type the function and finish with a line containing only `.` (Ctrl-D works
+too), or press `e` to open `$EDITOR` on the stub. On a pass it says so and
+moves on; on a failure you see the actual `go test` output and then the working
+version. A run that never terminates is killed after 30 seconds and counts as a
+miss.
+
+The generated module has no dependencies and is built with `GOPROXY=off`, so
+grading is offline and cannot pull anything. Your source lands in its own file,
+so an `import` block of your own is fine. If no `go` binary is on `PATH`, code
+drills quietly fall back to self-grading rather than failing.
 
 ## Adding drills
 
@@ -82,5 +104,6 @@ cmd/lcprac        flag parsing and subcommands
 internal/drill    the Drill type, validation, and the embedded deck
 internal/session  picking drills that fit a time budget
 internal/runner   the interactive prompt/answer/grade loop
+internal/codecheck compiles a code drill's answer and runs its tests
 internal/progress recorded history and the spaced-repetition schedule
 ```
