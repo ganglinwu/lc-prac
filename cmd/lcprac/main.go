@@ -55,11 +55,13 @@ func run(args []string) error {
 func usage() {
 	fmt.Fprint(os.Stderr, `lcprac - short LeetCode pattern drills
 
-  lcprac drill [-m 12] [-topic X] [-kind K] [-diff D] [-seed N] [-noretry] [-nolimit] [-tries 3] [-builtin]
+  lcprac drill [-m 12] [-topic X] [-kind K] [-diff D] [-seed N] [-noretry] [-nolimit] [-tries 3] [-builtin] [-weak] [-leech]
       Run a timed session that fits the minute budget (default 12). The clock
       is real: once the budget is spent no new drill starts. -nolimit disables
       that and lets the session run long. A failed code drill offers another
       try (3 by default, -tries changes it) before revealing the answer.
+      -weak aims the session at your weakest topic and -leech at the drills
+      you keep missing; both fall back to a normal session if history is thin.
   lcprac list [-topic X] [-kind K] [-diff D] [-builtin]
       List matching drills without running them. Yours are marked *.
   lcprac topics
@@ -124,6 +126,8 @@ func cmdDrill(args []string) error {
 	nolimit := fs.Bool("nolimit", false, "keep going past the minute budget instead of stopping")
 	tries := fs.Int("tries", 0, "compile tries allowed per code drill (0 = 3)")
 	builtinOnly := fs.Bool("builtin", false, "use only the builtin deck, ignoring your own drills")
+	weak := fs.Bool("weak", false, "spend the session on your weakest topic")
+	leech := fs.Bool("leech", false, "spend the session on the drills you keep missing")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -133,6 +137,12 @@ func cmdDrill(args []string) error {
 		return err
 	}
 	store := openStore()
+	if *weak || *leech {
+		set, *topic, err = narrowDeck(set, store, time.Now(), os.Stdout, *leech, *weak, *topic)
+		if err != nil {
+			return err
+		}
+	}
 	if *seed == 0 {
 		*seed = uint64(time.Now().UnixNano())
 	}
@@ -303,38 +313,23 @@ func cmdStats(args []string) error {
 
 	now := time.Now()
 	var seen, correct, assisted, due int
-	var stats []topicStat
-	for _, t := range set.Topics() {
-		row := topicStat{Topic: t, Total: len(set.Filter(t, "", ""))}
-		tAssisted := 0
-		for _, d := range set.Filter(t, "", "") {
-			r, ok := store.Get(d.ID)
-			if ok {
-				row.Tried++
-				row.Seen += r.Seen
-				row.Correct += r.Correct
-				tAssisted += r.Assisted
-			}
-			if store.Due(d.ID, now) {
-				row.Due++
-			}
-		}
-		stats = append(stats, row)
+	stats := topicStats(set, store, now)
+	for _, row := range stats {
 		seen += row.Seen
 		correct += row.Correct
-		assisted += tAssisted
+		assisted += row.Assisted
 		due += row.Due
-		fmt.Printf("%-16s %2d/%2d drills tried  %s  %2d due\n", t, row.Tried, row.Total, pct(row.Correct, row.Seen), row.Due)
+		fmt.Printf("%-16s %2d/%2d drills tried  %s  %2d due\n", row.Topic, row.Tried, row.Total, pct(row.Correct, row.Seen), row.Due)
 	}
 	fmt.Printf("\ntotal: %s over %d attempts, %d of %d drills due now\n", pct(correct, seen), seen, due, set.Len())
 	if assisted > 0 {
 		fmt.Printf("%d of those correct answers needed a hint.\n", assisted)
 	}
 	if n := len(store.Leeches()); n > 0 {
-		fmt.Printf("%d drill(s) keep beating you: lcprac review\n", n)
+		fmt.Printf("%d drill(s) keep beating you: lcprac review, or lcprac drill -leech\n", n)
 	}
 	if next := focus(stats); next != "" {
-		fmt.Printf("next up: lcprac drill -topic %s\n", next)
+		fmt.Printf("next up: lcprac drill -weak  (that is %s right now)\n", next)
 	}
 	printSessions(store, now)
 	fmt.Printf("history: %s\n", path)
@@ -378,16 +373,20 @@ func wholeMinutes(d time.Duration) int {
 // topicStat is one row of the stats table, kept as data so the focus pick can
 // be tested without printing.
 type topicStat struct {
-	Topic                            string
-	Tried, Total, Seen, Correct, Due int
+	Topic                                      string
+	Tried, Total, Seen, Correct, Assisted, Due int
 }
+
+// minAttemptsToJudge is how many graded attempts a topic needs before its
+// accuracy is taken seriously; below it a single miss would rank worst.
+const minAttemptsToJudge = 3
 
 // focus suggests what to practise next: the weakest topic you have real data
 // on, else the one with the most drills you have never tried.
 func focus(stats []topicStat) string {
 	best, bestAcc := "", 101
 	for _, t := range stats {
-		if t.Seen < 3 {
+		if t.Seen < minAttemptsToJudge {
 			continue
 		}
 		acc := t.Correct * 100 / t.Seen

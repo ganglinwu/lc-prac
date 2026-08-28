@@ -19,6 +19,8 @@ intervals, prefix-sum, dp, greedy, backtracking, bit-manipulation, complexity),
 go run ./cmd/lcprac                      # a ~12 minute session
 go run ./cmd/lcprac drill -m 15          # a 15 minute session
 go run ./cmd/lcprac drill -topic dp      # only dynamic programming
+go run ./cmd/lcprac drill -weak         # aim the session at your weakest topic
+go run ./cmd/lcprac drill -leech        # only the drills you keep missing
 go run ./cmd/lcprac drill -seed 42       # reproducible selection
 go run ./cmd/lcprac drill -tries 1       # code drills: one shot, then the answer
 go run ./cmd/lcprac list                 # every drill, no session
@@ -97,6 +99,23 @@ until it ends, so the count is taken from yesterday while today is still empty.
 attempts on record, and before that the topic with the most drills you have
 never tried. The log keeps the most recent 200 sessions and `stats -reset`
 clears it along with the drill history.
+
+## Aiming a session
+
+Two flags spend a whole sitting on what your history says is weak, so you do
+not have to read `stats` and copy a topic across:
+
+- `-weak` picks the same topic `next up` names and prints why it picked it
+  (the accuracy it is going on, or the coverage gap when there is no accuracy
+  yet). An explicit `-topic` wins; `-weak` then says it is being ignored.
+- `-leech` narrows the deck to the drills that keep beating you, the same set
+  `lcprac review` reads out. Use it when you want to be quizzed on them rather
+  than to reread them.
+
+Both can be combined, in which case `-weak` picks the weakest topic among the
+leeches. Neither is an error on a thin history: with no leeches, or not enough
+attempts to judge a topic, lcprac says so and runs a normal session instead of
+refusing to start.
 
 Every drill is written to history as soon as it is graded, not at the end of
 the sitting, so a session you abandon halfway keeps what you already did.
