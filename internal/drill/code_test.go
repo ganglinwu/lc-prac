@@ -146,3 +146,22 @@ func TestBuiltinCodeDrillsHaveHints(t *testing.T) {
 		}
 	}
 }
+
+// TestEveryTopicHasCodeDrill keeps the deck from drifting back to recall-only
+// topics: reciting the pattern is not the same as typing it under a clock.
+func TestEveryTopicHasCodeDrill(t *testing.T) {
+	// complexity drills are about analysing code, not writing it.
+	exempt := map[string]bool{"complexity": true}
+	set, err := drill.Builtin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, topic := range set.Topics() {
+		if exempt[topic] {
+			continue
+		}
+		if len(set.Filter(topic, drill.KindCode, "")) == 0 {
+			t.Errorf("topic %q has no code drill", topic)
+		}
+	}
+}

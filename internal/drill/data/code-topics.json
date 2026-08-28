@@ -1,0 +1,135 @@
+[
+  {
+    "id": "graph-num-islands-code",
+    "title": "Count islands in a grid",
+    "kind": "code",
+    "topic": "graphs",
+    "difficulty": "medium",
+    "est_minutes": 6,
+    "prompt": "Implement numIslands(grid [][]byte) int: how many groups of '1' cells are connected up, down, left or right. You may write over the grid.",
+    "answer": "func numIslands(grid [][]byte) int {\n\tcount := 0\n\tvar sink func(r, c int)\n\tsink = func(r, c int) {\n\t\tif r < 0 || r >= len(grid) || c < 0 || c >= len(grid[r]) || grid[r][c] != '1' {\n\t\t\treturn\n\t\t}\n\t\tgrid[r][c] = '0'\n\t\tsink(r+1, c)\n\t\tsink(r-1, c)\n\t\tsink(r, c+1)\n\t\tsink(r, c-1)\n\t}\n\tfor r := range grid {\n\t\tfor c := range grid[r] {\n\t\t\tif grid[r][c] == '1' {\n\t\t\t\tcount++\n\t\t\t\tsink(r, c)\n\t\t\t}\n\t\t}\n\t}\n\treturn count\n}",
+    "explanation": "Counting islands is counting how many times you have to start a flood fill. Overwriting each visited '1' with water is the visited set, so it costs no extra memory and the outer loop cannot count the same island twice.",
+    "hints": [
+      "When the outer scan lands on land, walk that whole island before moving on.",
+      "Sink what you visit (write water over it) so it is never counted again."
+    ],
+    "refs": [
+      "LC 200 Number of Islands"
+    ],
+    "code": {
+      "stub": "func numIslands(grid [][]byte) int {\n\t// your code here\n\treturn 0\n}",
+      "tests": "import \"testing\"\n\nfunc TestNumIslands(t *testing.T) {\n\tcases := []struct {\n\t\tname string\n\t\tgrid []string\n\t\twant int\n\t}{\n\t\t{\"one blob\", []string{\"11110\", \"11010\", \"11000\", \"00000\"}, 1},\n\t\t{\"three blobs\", []string{\"11000\", \"11000\", \"00100\", \"00011\"}, 3},\n\t\t{\"empty grid\", nil, 0},\n\t\t{\"all water\", []string{\"000\", \"000\"}, 0},\n\t\t{\"diagonals do not connect\", []string{\"10\", \"01\"}, 2},\n\t\t{\"single row\", []string{\"1011011\"}, 3},\n\t}\n\tfor _, c := range cases {\n\t\tgrid := make([][]byte, len(c.grid))\n\t\tfor i, row := range c.grid {\n\t\t\tgrid[i] = []byte(row)\n\t\t}\n\t\tif got := numIslands(grid); got != c.want {\n\t\t\tt.Errorf(\"%s: numIslands = %d, want %d\", c.name, got, c.want)\n\t\t}\n\t}\n}"
+    }
+  },
+  {
+    "id": "heap-kth-largest-code",
+    "title": "Kth largest with a size-k heap",
+    "kind": "code",
+    "topic": "heap",
+    "difficulty": "medium",
+    "est_minutes": 6,
+    "prompt": "Implement findKthLargest(nums []int, k int) int without sorting the whole slice. A minHeap type (container/heap ready) is already compiled in; import \"container/heap\" and use heap.Push/heap.Pop on &minHeap{}.",
+    "answer": "import \"container/heap\"\n\nfunc findKthLargest(nums []int, k int) int {\n\th := &minHeap{}\n\tfor _, n := range nums {\n\t\theap.Push(h, n)\n\t\tif h.Len() > k {\n\t\t\theap.Pop(h)\n\t\t}\n\t}\n\treturn (*h)[0]\n}",
+    "explanation": "Sorting is n log n and throws away the fact that k is small. Keeping only k candidates in a min-heap makes its root the kth largest by construction: push everything, pop whenever the heap grows past k, and the cost is n log k.",
+    "hints": [
+      "Only k numbers can ever matter; the smallest of those is the one to throw away.",
+      "If the smallest survivor is the answer, the heap you want is ordered smallest first."
+    ],
+    "refs": [
+      "LC 215 Kth Largest Element"
+    ],
+    "code": {
+      "stub": "func findKthLargest(nums []int, k int) int {\n\t// your code here\n\treturn 0\n}",
+      "preamble": "// minHeap is a ready-made min-heap of ints implementing heap.Interface, so\n// the drill is the algorithm rather than the container/heap boilerplate.\ntype minHeap []int\n\nfunc (h minHeap) Len() int           { return len(h) }\nfunc (h minHeap) Less(i, j int) bool { return h[i] < h[j] }\nfunc (h minHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }\nfunc (h *minHeap) Push(x any)        { *h = append(*h, x.(int)) }\n\nfunc (h *minHeap) Pop() any {\n\told := *h\n\tx := old[len(old)-1]\n\t*h = old[:len(old)-1]\n\treturn x\n}",
+      "tests": "import \"testing\"\n\nfunc TestFindKthLargest(t *testing.T) {\n\tcases := []struct {\n\t\tnums []int\n\t\tk    int\n\t\twant int\n\t}{\n\t\t{[]int{3, 2, 1, 5, 6, 4}, 2, 5},\n\t\t{[]int{3, 2, 3, 1, 2, 4, 5, 5, 6}, 4, 4},\n\t\t{[]int{1}, 1, 1},\n\t\t{[]int{7, 7, 7}, 2, 7},\n\t\t{[]int{-1, -5, -3}, 3, -5},\n\t\t{[]int{2, 1}, 2, 1},\n\t}\n\tfor _, c := range cases {\n\t\tif got := findKthLargest(append([]int(nil), c.nums...), c.k); got != c.want {\n\t\t\tt.Errorf(\"findKthLargest(%v, %d) = %d, want %d\", c.nums, c.k, got, c.want)\n\t\t}\n\t}\n}"
+    }
+  },
+  {
+    "id": "backtracking-subsets-code",
+    "title": "All subsets",
+    "kind": "code",
+    "topic": "backtracking",
+    "difficulty": "medium",
+    "est_minutes": 5,
+    "prompt": "Implement subsets(nums []int) [][]int: every subset of a slice of distinct ints, in any order. The empty subset counts.",
+    "answer": "func subsets(nums []int) [][]int {\n\tvar out [][]int\n\tvar cur []int\n\tvar walk func(i int)\n\twalk = func(i int) {\n\t\tif i == len(nums) {\n\t\t\tout = append(out, append([]int(nil), cur...))\n\t\t\treturn\n\t\t}\n\t\twalk(i + 1)\n\t\tcur = append(cur, nums[i])\n\t\twalk(i + 1)\n\t\tcur = cur[:len(cur)-1]\n\t}\n\twalk(0)\n\treturn out\n}",
+    "explanation": "Subsets is the plainest backtracking shape: at index i, recurse without nums[i], then with it, and undo the choice on the way out. Recording a copy matters because cur is reused; appending cur itself would leave every answer pointing at the same array.",
+    "hints": [
+      "Each element is one yes/no decision, so the recursion branches twice and needs no loop.",
+      "Snapshot the working slice when you record it, or later pushes will rewrite answers you already saved."
+    ],
+    "refs": [
+      "LC 78 Subsets"
+    ],
+    "code": {
+      "stub": "func subsets(nums []int) [][]int {\n\t// your code here\n\treturn nil\n}",
+      "tests": "import (\n\t\"fmt\"\n\t\"sort\"\n\t\"testing\"\n)\n\nfunc subsetKey(sub []int) string {\n\ts := append([]int(nil), sub...)\n\tsort.Ints(s)\n\treturn fmt.Sprint(s)\n}\n\nfunc TestSubsets(t *testing.T) {\n\tcases := []struct {\n\t\tnums []int\n\t\twant []string\n\t}{\n\t\t{[]int{1, 2, 3}, []string{\"[]\", \"[1]\", \"[2]\", \"[3]\", \"[1 2]\", \"[1 3]\", \"[2 3]\", \"[1 2 3]\"}},\n\t\t{[]int{0}, []string{\"[]\", \"[0]\"}},\n\t\t{nil, []string{\"[]\"}},\n\t}\n\tfor _, c := range cases {\n\t\tgot := subsets(c.nums)\n\t\tif len(got) != len(c.want) {\n\t\t\tt.Fatalf(\"subsets(%v) returned %d subsets, want %d\", c.nums, len(got), len(c.want))\n\t\t}\n\t\tseen := map[string]bool{}\n\t\tfor _, sub := range got {\n\t\t\tseen[subsetKey(sub)] = true\n\t\t}\n\t\tfor _, w := range c.want {\n\t\t\tif !seen[w] {\n\t\t\t\tt.Errorf(\"subsets(%v) is missing %s\", c.nums, w)\n\t\t\t}\n\t\t}\n\t}\n}"
+    }
+  },
+  {
+    "id": "matrix-rotate-code",
+    "title": "Rotate a square matrix in place",
+    "kind": "code",
+    "topic": "matrix",
+    "difficulty": "medium",
+    "est_minutes": 5,
+    "prompt": "Implement rotate(matrix [][]int): turn an n x n matrix 90 degrees clockwise, in place. No second grid.",
+    "answer": "func rotate(matrix [][]int) {\n\tn := len(matrix)\n\tfor r := 0; r < n; r++ {\n\t\tfor c := r + 1; c < n; c++ {\n\t\t\tmatrix[r][c], matrix[c][r] = matrix[c][r], matrix[r][c]\n\t\t}\n\t}\n\tfor _, row := range matrix {\n\t\tfor i, j := 0, n-1; i < j; i, j = i+1, j-1 {\n\t\t\trow[i], row[j] = row[j], row[i]\n\t\t}\n\t}\n}",
+    "explanation": "A clockwise rotation is a transpose followed by reversing each row. The transpose loop starts at c = r+1 so every pair is swapped once; starting from 0 swaps each pair twice and leaves the grid exactly as it was.",
+    "hints": [
+      "Two cheap passes over the same memory beat one clever pass, and beat allocating a second grid.",
+      "Mirror across the top-left to bottom-right diagonal first, then flip each row end to end."
+    ],
+    "refs": [
+      "LC 48 Rotate Image"
+    ],
+    "code": {
+      "stub": "func rotate(matrix [][]int) {\n\t// your code here\n}",
+      "tests": "import (\n\t\"reflect\"\n\t\"testing\"\n)\n\nfunc TestRotate(t *testing.T) {\n\tcases := []struct {\n\t\tin   [][]int\n\t\twant [][]int\n\t}{\n\t\t{[][]int{{1, 2}, {3, 4}}, [][]int{{3, 1}, {4, 2}}},\n\t\t{[][]int{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}, [][]int{{7, 4, 1}, {8, 5, 2}, {9, 6, 3}}},\n\t\t{[][]int{{5}}, [][]int{{5}}},\n\t\t{\n\t\t\t[][]int{{1, 2, 3, 4}, {5, 6, 7, 8}, {9, 10, 11, 12}, {13, 14, 15, 16}},\n\t\t\t[][]int{{13, 9, 5, 1}, {14, 10, 6, 2}, {15, 11, 7, 3}, {16, 12, 8, 4}},\n\t\t},\n\t}\n\tfor _, c := range cases {\n\t\trotate(c.in)\n\t\tif !reflect.DeepEqual(c.in, c.want) {\n\t\t\tt.Errorf(\"rotate = %v, want %v\", c.in, c.want)\n\t\t}\n\t}\n}"
+    }
+  },
+  {
+    "id": "greedy-jump-game-code",
+    "title": "Can you reach the last index",
+    "kind": "code",
+    "topic": "greedy",
+    "difficulty": "easy",
+    "est_minutes": 4,
+    "prompt": "Implement canJump(nums []int) bool: from index 0, nums[i] is the most you may jump forward from i. Can you land on the last index? One pass.",
+    "answer": "func canJump(nums []int) bool {\n\treach := 0\n\tfor i, n := range nums {\n\t\tif i > reach {\n\t\t\treturn false\n\t\t}\n\t\tif i+n > reach {\n\t\t\treach = i + n\n\t\t}\n\t}\n\treturn true\n}",
+    "explanation": "Greedy is safe here because only the furthest index you could be standing on matters, never the path that got you there. If the scan ever arrives at an index past that furthest point, nothing earlier could have covered it.",
+    "hints": [
+      "Carry one number: the furthest index still within your grasp so far.",
+      "The answer is false the moment the loop steps past that number, and true if it never does."
+    ],
+    "refs": [
+      "LC 55 Jump Game"
+    ],
+    "code": {
+      "stub": "func canJump(nums []int) bool {\n\t// your code here\n\treturn false\n}",
+      "tests": "import \"testing\"\n\nfunc TestCanJump(t *testing.T) {\n\tcases := []struct {\n\t\tnums []int\n\t\twant bool\n\t}{\n\t\t{[]int{2, 3, 1, 1, 4}, true},\n\t\t{[]int{3, 2, 1, 0, 4}, false},\n\t\t{[]int{0}, true},\n\t\t{[]int{0, 1}, false},\n\t\t{[]int{2, 0, 0}, true},\n\t\t{[]int{1, 0, 1, 0}, false},\n\t}\n\tfor _, c := range cases {\n\t\tif got := canJump(c.nums); got != c.want {\n\t\t\tt.Errorf(\"canJump(%v) = %v, want %v\", c.nums, got, c.want)\n\t\t}\n\t}\n}"
+    }
+  },
+  {
+    "id": "bits-hamming-weight-code",
+    "title": "Count the set bits",
+    "kind": "code",
+    "topic": "bit-manipulation",
+    "difficulty": "easy",
+    "est_minutes": 3,
+    "prompt": "Implement hammingWeight(n uint32) int: how many bits of n are 1. No math/bits, no strconv, and try to make the loop run once per set bit rather than 32 times.",
+    "answer": "func hammingWeight(n uint32) int {\n\tcount := 0\n\tfor n != 0 {\n\t\tn &= n - 1\n\t\tcount++\n\t}\n\treturn count\n}",
+    "explanation": "Subtracting one flips the lowest set bit to zero and turns every zero below it into a one, so and-ing the two together removes exactly that bit. The loop then costs one step per one-bit instead of one per bit of width.",
+    "hints": [
+      "Shifting 32 times works, but there is a trick that costs one step per one-bit.",
+      "Look at what n-1 does to the lowest one and to everything under it, then combine the two values."
+    ],
+    "refs": [
+      "LC 191 Number of 1 Bits"
+    ],
+    "code": {
+      "stub": "func hammingWeight(n uint32) int {\n\t// your code here\n\treturn 0\n}",
+      "tests": "import \"testing\"\n\nfunc TestHammingWeight(t *testing.T) {\n\tcases := []struct {\n\t\tin   uint32\n\t\twant int\n\t}{\n\t\t{0, 0},\n\t\t{1, 1},\n\t\t{11, 3},\n\t\t{128, 1},\n\t\t{2147483648, 1},\n\t\t{4294967293, 31},\n\t\t{4294967295, 32},\n\t}\n\tfor _, c := range cases {\n\t\tif got := hammingWeight(c.in); got != c.want {\n\t\t\tt.Errorf(\"hammingWeight(%d) = %d, want %d\", c.in, got, c.want)\n\t\t}\n\t}\n}"
+    }
+  }
+]
