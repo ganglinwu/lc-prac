@@ -43,6 +43,8 @@ func run(args []string) error {
 		return cmdAdd(args)
 	case "review":
 		return cmdReview(args)
+	case "note":
+		return cmdNote(args)
 	case "help", "-h", "--help":
 		usage()
 		return nil
@@ -72,6 +74,9 @@ func usage() {
   lcprac review [-n 5] [-topic X] [-all] [id...]
       Reread the drills you keep missing, answers shown. Name ids to read
       those instead; -all widens it to everything you have ever missed.
+  lcprac note [id] [your words] [-clear]
+      Keep your own wording on a drill. It is shown when the drill comes back
+      and in review. With no id it lists every note you have written.
   lcprac add [-file mine.json]
       Write a new drill of your own by answering a few prompts. It is appended
       to a file in your drills directory and is in the deck immediately.
@@ -162,6 +167,7 @@ func cmdDrill(args []string) error {
 		return err
 	}
 	run := runner.New(os.Stdin, os.Stdout)
+	run.Notes = notesFor(store)
 	run.RetryMisses = !*noretry
 	run.NoTimeLimit = *nolimit
 	run.CodeAttempts = *tries
@@ -179,6 +185,16 @@ func cmdDrill(args []string) error {
 		return nil
 	}
 	return saveResults(live, rep)
+}
+
+// notesFor collects your written notes by drill id, so the runner can show
+// yours next to the canned explanation when a drill comes back.
+func notesFor(store *progress.Store) map[string]string {
+	notes := map[string]string{}
+	for _, r := range store.Noted() {
+		notes[r.DrillID] = r.Note
+	}
+	return notes
 }
 
 // openStore loads history, degrading to an unsaved in-memory store rather than

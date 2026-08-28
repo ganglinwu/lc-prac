@@ -288,3 +288,61 @@ func TestLeechesAreWorstFirst(t *testing.T) {
 		t.Errorf("order = %s, %s; want awful, mild", got[0].DrillID, got[1].DrillID)
 	}
 }
+
+// A note on a drill you have never attempted must survive a save/load round
+// trip without counting as practice or as a due drill.
+func TestNoteOnUnseenDrill(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "progress.json")
+	s := New(path)
+	s.SetNote("two-pointers-1", "  left never rewinds  ")
+	if got := s.Note("two-pointers-1"); got != "left never rewinds" {
+		t.Fatalf("Note = %q, want the trimmed text", got)
+	}
+	if s.Len() != 0 {
+		t.Fatalf("Len = %d, a note-only record is not history", s.Len())
+	}
+	now := time.Date(2026, 3, 1, 9, 0, 0, 0, time.UTC)
+	if p := s.Priority("two-pointers-1", now); p != 100 {
+		t.Fatalf("Priority = %d, want the never-seen score 100", p)
+	}
+	if !s.Due("two-pointers-1", now) {
+		t.Fatal("a note-only drill should still be due like an unseen one")
+	}
+	if err := s.Save(); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	back, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got := back.Note("two-pointers-1"); got != "left never rewinds" {
+		t.Fatalf("after reload Note = %q", got)
+	}
+}
+
+func TestSetNoteKeepsHistoryAndClears(t *testing.T) {
+	now := time.Date(2026, 3, 1, 9, 0, 0, 0, time.UTC)
+	s := New("")
+	s.Record("a", false, now)
+	s.SetNote("a", "watch the empty window")
+	r, ok := s.Get("a")
+	if !ok || r.Seen != 1 || r.Note != "watch the empty window" {
+		t.Fatalf("record = %+v, ok = %v", r, ok)
+	}
+	if n := s.Noted(); len(n) != 1 || n[0].DrillID != "a" {
+		t.Fatalf("Noted = %+v", n)
+	}
+
+	s.SetNote("a", "")
+	if r, ok := s.Get("a"); !ok || r.Seen != 1 || r.Note != "" {
+		t.Fatalf("clearing a note must keep the history: %+v ok=%v", r, ok)
+	}
+	s.SetNote("b", "throwaway")
+	s.SetNote("b", "")
+	if _, ok := s.Get("b"); ok {
+		t.Fatal("clearing the only reason a record exists should drop it")
+	}
+	if n := s.Noted(); len(n) != 0 {
+		t.Fatalf("Noted = %+v, want none", n)
+	}
+}

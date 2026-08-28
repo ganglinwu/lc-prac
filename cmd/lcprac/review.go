@@ -109,6 +109,9 @@ func writeReview(w io.Writer, d drill.Drill, r progress.Record, spaced bool) {
 	}
 	fmt.Fprintf(w, "\nanswer:\n%s\n", indent(d.Answer))
 	fmt.Fprintf(w, "why:\n%s\n", indent(d.Explanation))
+	if r.Note != "" {
+		fmt.Fprintf(w, "your note:\n%s\n", indent(r.Note))
+	}
 	if len(d.Refs) > 0 {
 		fmt.Fprintf(w, "refs: %s\n", strings.Join(d.Refs, ", "))
 	}

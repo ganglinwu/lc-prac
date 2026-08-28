@@ -674,3 +674,25 @@ func TestOnResultFiresPerFirstPassDrill(t *testing.T) {
 		t.Errorf("second callback = %+v, want a correct %q", seen[1], second.ID)
 	}
 }
+
+// Your own wording is the point of a note, so it has to appear next to the
+// canned explanation when the drill comes back around.
+func TestRunShowsYourNote(t *testing.T) {
+	var out strings.Builder
+	r := New(strings.NewReader("2\n"), &out)
+	r.RetryMisses = false
+	r.Notes = map[string]string{"c": "smallest-k wants a max-heap"}
+	if _, err := r.Run(session.Session{Drills: []drill.Drill{choiceDrill()}, BudgetMinutes: 10}); err != nil {
+		t.Fatal(err)
+	}
+	if got := out.String(); !strings.Contains(got, "your note: smallest-k wants a max-heap") {
+		t.Fatalf("note not shown:\n%s", got)
+	}
+}
+
+func TestRunWithoutNoteSaysNothing(t *testing.T) {
+	_, out := runWith(t, "2\n", choiceDrill())
+	if strings.Contains(out, "your note") {
+		t.Fatalf("unexpected note line:\n%s", out)
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -30,6 +31,9 @@ type Record struct {
 	Streak   int       `json:"streak"`
 	LastSeen time.Time `json:"last_seen"`
 	DueAt    time.Time `json:"due_at"`
+	// Note is your own words on this drill, kept next to the history so the
+	// thing that made it click comes back with the drill.
+	Note string `json:"note,omitempty"`
 }
 
 // intervals is a Leitner ladder indexed by streak. A miss drops you to 0, so
@@ -142,8 +146,51 @@ func (s *Store) Records() []Record {
 	return out
 }
 
-// Len reports how many drills have any history.
-func (s *Store) Len() int { return len(s.records) }
+// Len reports how many drills have been attempted. A drill that only carries
+// a note is not practice, so it does not count as history.
+func (s *Store) Len() int {
+	n := 0
+	for _, r := range s.records {
+		if r.Seen > 0 {
+			n++
+		}
+	}
+	return n
+}
+
+// SetNote attaches your own words to a drill, creating a note-only record for
+// one you have never attempted. An empty note clears it, dropping the record
+// entirely when there is no history under it.
+func (s *Store) SetNote(id, note string) {
+	note = strings.TrimSpace(note)
+	r, ok := s.records[id]
+	if !ok {
+		if note == "" {
+			return
+		}
+		r = Record{DrillID: id}
+	}
+	r.Note = note
+	if note == "" && r.Seen == 0 {
+		delete(s.records, id)
+		return
+	}
+	s.records[id] = r
+}
+
+// Note returns your words on a drill, empty if you have not written any.
+func (s *Store) Note(id string) string { return s.records[id].Note }
+
+// Noted returns every record carrying a note, ordered by drill id.
+func (s *Store) Noted() []Record {
+	var out []Record
+	for _, r := range s.Records() {
+		if r.Note != "" {
+			out = append(out, r)
+		}
+	}
+	return out
+}
 
 // Record folds one graded attempt into the history and reschedules the drill.
 func (s *Store) Record(id string, correct bool, now time.Time) Record {
@@ -181,7 +228,7 @@ func (s *Store) RecordOutcome(id string, o Outcome, now time.Time) Record {
 // drills beat never-seen ones, which beat drills that are still resting.
 func (s *Store) Priority(id string, now time.Time) int {
 	r, ok := s.records[id]
-	if !ok {
+	if !ok || r.Seen == 0 {
 		return 100
 	}
 	if !now.Before(r.DueAt) {
@@ -201,7 +248,7 @@ func (s *Store) Priority(id string, now time.Time) int {
 // Due reports whether the drill is scheduled to come back by now.
 func (s *Store) Due(id string, now time.Time) bool {
 	r, ok := s.records[id]
-	if !ok {
+	if !ok || r.Seen == 0 {
 		return true
 	}
 	return !now.Before(r.DueAt)

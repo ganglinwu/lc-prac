@@ -27,6 +27,7 @@ go run ./cmd/lcprac list                 # every drill, no session
 go run ./cmd/lcprac topics               # topics and their drill counts
 go run ./cmd/lcprac stats                # accuracy, streak, recent sessions, what is due
 go run ./cmd/lcprac review               # reread the drills that keep beating you
+go run ./cmd/lcprac note <id> <words>    # keep your own wording on a drill
 go run ./cmd/lcprac add                  # write a drill of your own, one prompt at a time
 go run ./cmd/lcprac mine                 # your own drills and where they live
 ```
@@ -143,6 +144,23 @@ lcprac review -topic dp       # only one topic
 lcprac review -all            # everything you have ever missed once
 lcprac review hashmap-two-sum-code # any drill by id, history or not
 ```
+
+## Your own words on a drill
+
+The canned explanation is someone else's phrasing. The sentence that actually
+made a pattern click is usually yours, so `lcprac note` keeps it next to the
+drill's history:
+
+```
+lcprac note twoptr-sorted-pair left never rewinds, so it is O(n)
+lcprac note twoptr-sorted-pair   # read the note back
+lcprac note                            # every note you have written
+lcprac note twoptr-sorted-pair -clear  # or -clear before the id
+```
+
+A note is shown after the answer when the drill comes back in a session, and in
+`lcprac review`. Writing one on a drill you have never done does not mark it as
+practised or bring it forward in the schedule.
 
 ## Drill kinds
 

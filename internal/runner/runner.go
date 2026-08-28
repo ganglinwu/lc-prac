@@ -99,6 +99,9 @@ type Runner struct {
 	// CodeAttempts caps the tries allowed on one code drill before the
 	// working version is revealed. Zero means defaultCodeAttempts.
 	CodeAttempts int
+	// Notes holds your own wording on a drill by id, shown after the answer
+	// so what you wrote comes back with the drill.
+	Notes map[string]string
 	// OnResult, if set, is called with each first-pass result as soon as it
 	// is graded, so history survives a session that never reaches its end.
 	// Second-pass retries are unscored and never reported here.
@@ -272,6 +275,9 @@ func (r *Runner) runOne(label string, d drill.Drill, deadline time.Time) (Result
 			fmt.Fprintf(r.out, "\nnot quite. answer: %s\n", d.Answer)
 		}
 		fmt.Fprintf(r.out, "\n%s\n", d.Explanation)
+	}
+	if n := r.Notes[d.ID]; n != "" {
+		fmt.Fprintf(r.out, "\nyour note: %s\n", n)
 	}
 	if len(d.Refs) > 0 {
 		fmt.Fprintf(r.out, "\nrelated: %s\n", strings.Join(d.Refs, ", "))
