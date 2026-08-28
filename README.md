@@ -224,6 +224,20 @@ A bare number has to be the problem's own number, so `-problem 34` does not
 drag in LC 340. Unlike `-weak` and `-leech`, a problem nothing matches is an
 error rather than a random session, so a typo never quietly costs you a sitting.
 
+Every saved session closes with the same handoff without you asking for it:
+once the summary is printed, lcprac names one real problem behind the drills
+you just did and the command to log it.
+
+```
+now attempt LC 200 Number of Islands for real: you missed a drill behind it just now.
+log how it goes with `lcprac attempt 200`.
+```
+
+It prefers a problem whose drill you just got wrong, otherwise the weakest one
+in the `problems` ranking, and it skips anything you already solved for real in
+the last 60 days. A sitting where every drill was skipped, or where no drill
+names a problem, ends with no such line.
+
 ## Logging the real thing
 
 When you have actually sat down and attempted a problem, tell it how that went:

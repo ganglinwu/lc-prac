@@ -72,6 +72,8 @@ func usage() {
       you keep missing; both fall back to a normal session if history is thin.
       -problem warms you up on the drills behind one real problem before you
       attempt it: give a number or part of a title, e.g. -problem 56.
+      A saved session ends by naming one real problem behind the drills you
+      just did, so the sitting can finish on the real thing.
   lcprac list [-topic X] [-kind K] [-diff D] [-builtin]
       List matching drills without running them. Yours are marked *.
   lcprac topics
@@ -217,7 +219,11 @@ func cmdDrill(args []string) error {
 	if *nosave {
 		return nil
 	}
-	return saveResults(live, rep)
+	if err := saveResults(live, rep); err != nil {
+		return err
+	}
+	suggestProblem(os.Stdout, set, store, rep, time.Now())
+	return nil
 }
 
 // notesFor collects your written notes by drill id, so the runner can show
