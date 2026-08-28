@@ -25,6 +25,20 @@ Install it as a real binary with `go install ./cmd/lcprac`.
 During a session, answer the prompt and press enter, or type `s` to skip.
 Ctrl-D quits early and still prints the summary.
 
+## The clock is real
+
+`-m` is a wall-clock ceiling, not just an estimate the session is packed
+against. Before each drill lcprac checks how long you have actually taken, and
+once the budget is spent it stops and tells you what is left for next time. The
+check happens between drills, so a drill you are part way through is never cut
+off: a session overruns by at most the one in progress. The second pass gets a
+further quarter of the budget, enough for reinforcement without an open-ended
+overrun.
+
+A drill that takes more than twice its estimate gets a pace note, and the
+summary prints how long each drill actually took, so the estimates in the deck
+can be checked against reality. `-nolimit` removes the ceiling.
+
 ## Second pass
 
 Anything you miss is re-asked once at the end of the session, while the
@@ -54,7 +68,8 @@ to wipe history.
 History lives in `$LCPRAC_HOME/progress.json` if that is set, otherwise
 `$XDG_DATA_HOME/lcprac/` or `~/.local/share/lcprac/`. Two flags opt out:
 `-shuffle` picks at random and ignores your history, `-nosave` runs a session
-without recording it, `-noretry` drops the second pass.
+without recording it, `-noretry` drops the second pass, `-nolimit` removes the
+time ceiling.
 
 ## Drill kinds
 

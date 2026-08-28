@@ -324,3 +324,88 @@ func TestCodeDrillEndsCleanlyWhenInputRunsOut(t *testing.T) {
 		t.Error("summary should still print")
 	}
 }
+
+// runClock drives a session with a clock that advances by step on every read,
+// so a test can spend the budget deterministically.
+func runClock(t *testing.T, budgetMin int, step time.Duration, retry bool, input string, ds ...drill.Drill) (Report, string) {
+	t.Helper()
+	var out strings.Builder
+	r := New(strings.NewReader(input), &out)
+	r.RetryMisses = retry
+	now := time.Unix(0, 0)
+	r.Now = func() time.Time {
+		now = now.Add(step)
+		return now
+	}
+	rep, err := r.Run(session.Session{Drills: ds, BudgetMinutes: budgetMin})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return rep, out.String()
+}
+
+func TestSessionStopsWhenTheBudgetIsSpent(t *testing.T) {
+	// Each clock read costs a minute, so a 5m budget cannot reach drill three.
+	rep, out := runClock(t, 5, time.Minute, false, "2\n2\n2\n", choiceDrill(), choiceDrill(), choiceDrill())
+	if len(rep.Results) != 2 {
+		t.Fatalf("asked %d drills, want 2 before the budget ran out", len(rep.Results))
+	}
+	if len(rep.Unasked) != 1 {
+		t.Fatalf("Unasked = %d, want 1", len(rep.Unasked))
+	}
+	if !strings.Contains(out, "time is up") {
+		t.Error("the stop should be explained in the output")
+	}
+	if !strings.Contains(out, "not reached") {
+		t.Error("the summary should list the drill the clock cut")
+	}
+}
+
+func TestBudgetIsCheckedBetweenDrillsNotDuringOne(t *testing.T) {
+	// A drill that overruns still gets graded rather than being cut off.
+	rep, _ := runClock(t, 2, time.Minute, false, "2\n2\n", choiceDrill(), choiceDrill())
+	if len(rep.Results) != 1 {
+		t.Fatalf("asked %d drills, want the first one to finish", len(rep.Results))
+	}
+	if !rep.Results[0].Correct {
+		t.Error("the in-progress drill should still have been graded")
+	}
+}
+
+func TestNoTimeLimitRunsEveryDrill(t *testing.T) {
+	var out strings.Builder
+	r := New(strings.NewReader("2\n2\n2\n"), &out)
+	r.RetryMisses = false
+	r.NoTimeLimit = true
+	now := time.Unix(0, 0)
+	r.Now = func() time.Time {
+		now = now.Add(time.Minute)
+		return now
+	}
+	rep, err := r.Run(session.Session{Drills: []drill.Drill{choiceDrill(), choiceDrill(), choiceDrill()}, BudgetMinutes: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.Results) != 3 || len(rep.Unasked) != 0 {
+		t.Fatalf("got %d results and %d unasked, want 3 and 0", len(rep.Results), len(rep.Unasked))
+	}
+}
+
+func TestSecondPassGetsAQuarterOfTheBudgetPastTheDeadline(t *testing.T) {
+	// 8m budget plus a 2m grace: one retry fits, the second does not.
+	rep, out := runClock(t, 8, time.Minute, true, "1\n1\n1\n1\n", choiceDrill(), choiceDrill())
+	if len(rep.Retries) != 1 {
+		t.Fatalf("Retries = %d, want 1 before the grace ran out", len(rep.Retries))
+	}
+	if !strings.Contains(out, "out of time for the rest of the second pass") {
+		t.Error("the truncated second pass should say so")
+	}
+}
+
+func TestSlowDrillGetsAPaceNote(t *testing.T) {
+	// choiceDrill estimates 2m, so a drill that takes 5m is well over 2x.
+	_, out := runClock(t, 60, 5*time.Minute, false, "2\n", choiceDrill())
+	if !strings.Contains(out, "pace:") {
+		t.Errorf("a drill well over its estimate should get a pace note, got:\n%s", out)
+	}
+}

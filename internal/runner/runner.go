@@ -33,11 +33,13 @@ type Result struct {
 
 // Report is the tally for a whole session. Retries holds the second-pass
 // attempts at drills missed on the first pass; they are reinforcement only and
-// never counted in Score.
+// never counted in Score. Unasked holds drills the clock ran out on.
 type Report struct {
 	Results []Result
 	Retries []Result
+	Unasked []drill.Drill
 	Elapsed time.Duration
+	Budget  time.Duration
 }
 
 // Missed lists the drills answered wrong on the first pass.
@@ -73,6 +75,11 @@ type Runner struct {
 	Now func() time.Time
 	// RetryMisses re-asks missed drills once at the end of the session.
 	RetryMisses bool
+	// Budget is the wall-clock ceiling for the session. Zero means take it
+	// from the session's minute budget; NoTimeLimit means do not stop at all.
+	Budget time.Duration
+	// NoTimeLimit lets a session run past its budget.
+	NoTimeLimit bool
 	// Grade compiles and runs a code drill. Nil means no Go toolchain is
 	// available, so code drills fall back to self-grading.
 	Grade func(context.Context, codecheck.Program) (codecheck.Result, error)
@@ -100,15 +107,40 @@ func (r *Runner) selfGrades(d drill.Drill) bool {
 	return d.SelfGraded()
 }
 
-// Run walks the session, returning once every drill is answered or the input
-// stream ends.
+// budget resolves the wall-clock ceiling for a session. The estimate the
+// session was packed against is only an estimate, so the real clock is what
+// keeps a sitting inside the 10-15 minutes it promised.
+func (r *Runner) budget(s session.Session) time.Duration {
+	if r.NoTimeLimit {
+		return 0
+	}
+	if r.Budget > 0 {
+		return r.Budget
+	}
+	return time.Duration(s.BudgetMinutes) * time.Minute
+}
+
+// Run walks the session, returning once every drill is answered, the budget is
+// spent, or the input stream ends.
 func (r *Runner) Run(s session.Session) (Report, error) {
 	start := r.Now()
+	budget := r.budget(s)
+	var deadline time.Time
+	if budget > 0 {
+		deadline = start.Add(budget)
+	}
 	fmt.Fprintf(r.out, "\n%d drills, about %d min (budget %d)\n", len(s.Drills), s.TotalMinutes(), s.BudgetMinutes)
 	fmt.Fprintln(r.out, strings.Repeat("=", 60))
 
-	var rep Report
+	rep := Report{Budget: budget}
 	for i, d := range s.Drills {
+		// Checked before starting, so a session overruns by at most the
+		// drill in progress instead of being cut off mid-answer.
+		if !deadline.IsZero() && !r.Now().Before(deadline) {
+			rep.Unasked = append(rep.Unasked, s.Drills[i:]...)
+			fmt.Fprintf(r.out, "\ntime is up (%s). %d left for next time.\n", budget.Round(time.Second), len(rep.Unasked))
+			break
+		}
 		res, err := r.runOne(fmt.Sprintf("%d/%d", i+1, len(s.Drills)), d)
 		if err == io.EOF {
 			break
@@ -118,7 +150,7 @@ func (r *Runner) Run(s session.Session) (Report, error) {
 		}
 		rep.Results = append(rep.Results, res)
 	}
-	if err := r.retryPass(&rep); err != nil {
+	if err := r.retryPass(&rep, deadline); err != nil {
 		return rep, err
 	}
 	rep.Elapsed = r.Now().Sub(start)
@@ -129,13 +161,22 @@ func (r *Runner) Run(s session.Session) (Report, error) {
 // retryPass re-asks every missed drill once, straight away. Scheduling puts a
 // miss 10 minutes out, which is a later sitting, so without this you never see
 // the drill again while the explanation is still fresh.
-func (r *Runner) retryPass(rep *Report) error {
+// The pass gets a quarter of the budget beyond the deadline: reinforcement is
+// worth a small overrun, but not an unbounded one.
+func (r *Runner) retryPass(rep *Report, deadline time.Time) error {
 	missed := rep.Missed()
 	if !r.RetryMisses || len(missed) == 0 {
 		return nil
 	}
+	if !deadline.IsZero() {
+		deadline = deadline.Add(rep.Budget / 4)
+	}
 	fmt.Fprintf(r.out, "\n"+strings.Repeat("-", 60)+"\nsecond pass: %d missed, once more while it is fresh\n", len(missed))
 	for i, d := range missed {
+		if !deadline.IsZero() && !r.Now().Before(deadline) {
+			fmt.Fprintf(r.out, "\nout of time for the rest of the second pass.\n")
+			return nil
+		}
 		res, err := r.runOne(fmt.Sprintf("retry %d/%d", i+1, len(missed)), d)
 		if err == io.EOF {
 			return nil
@@ -211,6 +252,9 @@ func (r *Runner) runOne(label string, d drill.Drill) (Result, error) {
 		fmt.Fprintf(r.out, "\nrelated: %s\n", strings.Join(d.Refs, ", "))
 	}
 	res.Elapsed = r.Now().Sub(started)
+	if est := time.Duration(d.EstMinutes) * time.Minute; est > 0 && res.Elapsed > 2*est {
+		fmt.Fprintf(r.out, "\npace: %s on a ~%dm drill.\n", res.Elapsed.Round(time.Second), d.EstMinutes)
+	}
 	return res, nil
 }
 
@@ -306,7 +350,11 @@ func EditInEditor(initial string) (string, error) {
 func (r *Runner) printSummary(rep Report) {
 	correct, attempted := rep.Score()
 	fmt.Fprintln(r.out, "\n"+strings.Repeat("=", 60))
-	fmt.Fprintf(r.out, "%d/%d correct in %s\n", correct, attempted, rep.Elapsed.Round(time.Second))
+	budget := ""
+	if rep.Budget > 0 {
+		budget = fmt.Sprintf(" of a %s budget", rep.Budget.Round(time.Second))
+	}
+	fmt.Fprintf(r.out, "%d/%d correct in %s%s\n", correct, attempted, rep.Elapsed.Round(time.Second), budget)
 	for _, res := range rep.Results {
 		mark := "x"
 		switch {
@@ -315,7 +363,10 @@ func (r *Runner) printSummary(rep Report) {
 		case res.Correct:
 			mark = "+"
 		}
-		fmt.Fprintf(r.out, "  %s %s (%s)\n", mark, res.Drill.Title, res.Drill.Topic)
+		fmt.Fprintf(r.out, "  %s %s (%s) %s\n", mark, res.Drill.Title, res.Drill.Topic, res.Elapsed.Round(time.Second))
+	}
+	for _, d := range rep.Unasked {
+		fmt.Fprintf(r.out, "  . %s (%s) not reached\n", d.Title, d.Topic)
 	}
 	if len(rep.Retries) > 0 {
 		var got int
