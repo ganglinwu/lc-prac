@@ -1,0 +1,310 @@
+[
+  {
+    "id": "linkedlist-dummy-head",
+    "title": "Why a dummy head",
+    "kind": "recall",
+    "topic": "linked-list",
+    "difficulty": "easy",
+    "est_minutes": 2,
+    "prompt": "You are deleting nodes from a linked list by value. What does a dummy head node buy you?",
+    "answer": "It removes the special case for deleting the first node: every real node now has a predecessor you can point past it, and you return dummy.Next at the end.",
+    "explanation": "Most linked-list bugs are the head case. A dummy makes the head structurally identical to every other node, so the loop body has one branch instead of two.",
+    "refs": [
+      "LC 203 Remove Linked List Elements",
+      "LC 21 Merge Two Sorted Lists"
+    ]
+  },
+  {
+    "id": "linkedlist-cycle-fast-slow",
+    "title": "Detecting a cycle",
+    "kind": "recall",
+    "topic": "linked-list",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "Fast and slow pointers detect a cycle in a linked list. Why are they guaranteed to meet, and what is the space cost?",
+    "answer": "Once both are inside the loop, fast gains exactly one node per step on slow, so the gap shrinks by 1 each step and must hit 0. O(1) space, O(n) time.",
+    "explanation": "The relative speed argument is the whole proof: any gap of size g closes in g steps. A hash set of visited nodes also works but costs O(n) space, which is what the two-pointer trick removes.",
+    "refs": [
+      "LC 141 Linked List Cycle",
+      "LC 142 Linked List Cycle II"
+    ]
+  },
+  {
+    "id": "linkedlist-middle-node",
+    "title": "Finding the middle in one pass",
+    "kind": "choice",
+    "topic": "linked-list",
+    "difficulty": "easy",
+    "est_minutes": 2,
+    "prompt": "One pass, no length count: which loop condition leaves slow on the second middle of an even-length list?",
+    "choices": [
+      "for fast != nil && fast.Next != nil { slow = slow.Next; fast = fast.Next.Next }",
+      "for fast.Next != nil && fast.Next.Next != nil { ... }",
+      "for slow != nil { slow = slow.Next; fast = fast.Next }",
+      "for fast != nil { slow = slow.Next; fast = fast.Next.Next }"
+    ],
+    "answer": "for fast != nil && fast.Next != nil { slow = slow.Next; fast = fast.Next.Next }",
+    "explanation": "Both nil checks are needed or fast.Next.Next panics. The second option stops one step earlier and lands on the first middle, which is what you want when you are splitting the list for a merge sort.",
+    "refs": [
+      "LC 876 Middle of the Linked List"
+    ]
+  },
+  {
+    "id": "intervals-sort-key",
+    "title": "Sort by start or by end",
+    "kind": "recall",
+    "topic": "intervals",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "Merging overlapping intervals versus keeping the maximum number of non-overlapping intervals: which sort key does each want, and why?",
+    "answer": "Merging sorts by start, so any overlap with the running interval must begin inside it. Max non-overlapping (interval scheduling) sorts by end, greedily taking the earliest finisher to leave the most room.",
+    "explanation": "Same input shape, opposite key. The tell is whether you are combining everything (start) or choosing a subset (end): the greedy exchange argument only works on the earliest end time.",
+    "refs": [
+      "LC 56 Merge Intervals",
+      "LC 435 Non-overlapping Intervals"
+    ]
+  },
+  {
+    "id": "intervals-overlap-test",
+    "title": "Do two intervals overlap",
+    "kind": "recall",
+    "topic": "intervals",
+    "difficulty": "easy",
+    "est_minutes": 2,
+    "prompt": "Write the condition for intervals a and b overlapping, without enumerating cases.",
+    "answer": "a.start < b.end && b.start < a.end (use <= on both if touching endpoints count as overlapping).",
+    "explanation": "Negating the two disjoint cases (a entirely left of b, or b entirely left of a) collapses four positional cases into one expression. Case enumeration is where the off-by-ones live.",
+    "refs": [
+      "LC 252 Meeting Rooms",
+      "LC 986 Interval List Intersections"
+    ]
+  },
+  {
+    "id": "prefix-sum-when",
+    "title": "When a prefix sum beats a window",
+    "kind": "recall",
+    "topic": "prefix-sum",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "Counting subarrays with sum k: why does a sliding window fail when the array can hold negatives, and what replaces it?",
+    "answer": "A window needs the sum to be monotonic in the window size so shrinking is safe; negatives break that. Replace it with running prefix sums in a map, asking how many earlier prefixes equal sum-k.",
+    "explanation": "Sliding window is a monotonicity trick in disguise. The moment growing the window can lower the sum, you fall back to prefix sums, which make no assumption about sign.",
+    "refs": [
+      "LC 560 Subarray Sum Equals K"
+    ]
+  },
+  {
+    "id": "prefix-sum-empty-seed",
+    "title": "The 0 -> 1 seed",
+    "kind": "recall",
+    "topic": "prefix-sum",
+    "difficulty": "medium",
+    "est_minutes": 2,
+    "prompt": "In the prefix-sum-count-map solution, why is the map seeded with {0: 1} before the loop?",
+    "answer": "It stands for the empty prefix, so a subarray that starts at index 0 and sums to k finds a match. Without it, every such subarray is uncounted.",
+    "explanation": "prefix[-1] = 0 is a real prefix, it just has no loop iteration. Seeding is how you give a base case to a running accumulator.",
+    "refs": [
+      "LC 560 Subarray Sum Equals K",
+      "LC 523 Continuous Subarray Sum"
+    ]
+  },
+  {
+    "id": "greedy-jump-game",
+    "title": "Jump game reachability",
+    "kind": "recall",
+    "topic": "greedy",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "nums[i] is the maximum jump length from index i. What single value do you track to decide if the last index is reachable?",
+    "answer": "The furthest index reachable so far. Scan left to right, and if i ever exceeds that reach you are stuck; otherwise extend reach to max(reach, i+nums[i]).",
+    "explanation": "You never need to know which path got you there, only whether the prefix is reachable at all. That collapses an O(n^2) DP into one scalar.",
+    "refs": [
+      "LC 55 Jump Game",
+      "LC 45 Jump Game II"
+    ]
+  },
+  {
+    "id": "greedy-vs-dp",
+    "title": "When greedy is actually safe",
+    "kind": "choice",
+    "topic": "greedy",
+    "difficulty": "medium",
+    "est_minutes": 2,
+    "prompt": "What has to be true for a greedy choice to be provably correct?",
+    "choices": [
+      "Taking the locally best choice never rules out an optimal solution (exchange argument)",
+      "The input is sorted",
+      "The problem has overlapping subproblems",
+      "The answer is a single number rather than a sequence"
+    ],
+    "answer": "Taking the locally best choice never rules out an optimal solution (exchange argument)",
+    "explanation": "Greedy needs an exchange argument: any optimal solution can be rewritten to start with your choice without getting worse. Sorting is usually just how you expose that choice, not the justification.",
+    "refs": [
+      "LC 435 Non-overlapping Intervals"
+    ]
+  },
+  {
+    "id": "bits-clear-lowest-set",
+    "title": "n & (n-1)",
+    "kind": "recall",
+    "topic": "bit-manipulation",
+    "difficulty": "easy",
+    "est_minutes": 2,
+    "prompt": "What does n & (n-1) do, and what two problems does it solve in one line each?",
+    "answer": "It clears the lowest set bit. Looping it counts set bits in O(popcount) instead of O(32), and n > 0 && n&(n-1) == 0 tests for a power of two.",
+    "explanation": "Subtracting 1 flips the lowest 1 to 0 and all zeros below it to 1; the AND keeps only the bits above. Recognising the identity is faster than re-deriving the bit shifting each time.",
+    "refs": [
+      "LC 191 Number of 1 Bits",
+      "LC 231 Power of Two"
+    ]
+  },
+  {
+    "id": "bits-xor-single",
+    "title": "XOR to find the unpaired value",
+    "kind": "recall",
+    "topic": "bit-manipulation",
+    "difficulty": "easy",
+    "est_minutes": 2,
+    "prompt": "Every element appears twice except one. Why does XOR-ing everything return the single element?",
+    "answer": "XOR is associative and commutative with x^x = 0 and x^0 = x, so pairs cancel regardless of order and only the unpaired value survives.",
+    "explanation": "The algebra is the point: any operation with those three properties turns a multiset into a cancellation problem, which is why order and position can be ignored entirely. O(1) space.",
+    "refs": [
+      "LC 136 Single Number"
+    ]
+  },
+  {
+    "id": "backtracking-subsets-vs-perms",
+    "title": "Subsets vs permutations",
+    "kind": "recall",
+    "topic": "backtracking",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "Both subsets and permutations are backtracking over the same array. What differs in the recursive call?",
+    "answer": "Subsets pass a start index and loop i from start, so each element is only ever considered forward (order does not matter). Permutations loop over all indices with a used[] marker, since order does matter.",
+    "explanation": "The choice of \"what may I pick next\" encodes whether the output is a set or a sequence. Passing start where you needed used[] silently produces combinations instead of permutations.",
+    "refs": [
+      "LC 78 Subsets",
+      "LC 46 Permutations"
+    ]
+  },
+  {
+    "id": "backtracking-dupe-pruning",
+    "title": "Skipping duplicate branches",
+    "kind": "recall",
+    "topic": "backtracking",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "The input has duplicate values and the output must have no duplicate combinations. What is the standard prune?",
+    "answer": "Sort the input, then inside the loop skip when i > start && nums[i] == nums[i-1]: only the first copy of a value may open a branch at a given depth.",
+    "explanation": "Duplicates matter per level, not globally, which is why the guard is i > start and not i > 0. Getting that wrong drops valid combinations that legitimately reuse a value at a deeper level.",
+    "refs": [
+      "LC 90 Subsets II",
+      "LC 40 Combination Sum II"
+    ]
+  },
+  {
+    "id": "heap-running-median",
+    "title": "Two heaps for a running median",
+    "kind": "recall",
+    "topic": "heap",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "You need the median of a growing stream. Which two heaps do you keep, and what invariant do you restore after every insert?",
+    "answer": "A max-heap of the lower half and a min-heap of the upper half. After each insert, rebalance so their sizes differ by at most one and every element in the low heap is <= every element in the high heap.",
+    "explanation": "The median is always at a heap root, so the whole problem becomes maintaining a partition. Rebalancing usually means pushing onto one heap then moving its root to the other.",
+    "refs": [
+      "LC 295 Find Median from Data Stream"
+    ]
+  },
+  {
+    "id": "hashmap-longest-consecutive",
+    "title": "Longest consecutive sequence",
+    "kind": "recall",
+    "topic": "hashmap",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "Longest run of consecutive integers in an unsorted array, in O(n). What is the trick that keeps it linear instead of O(n log n)?",
+    "answer": "Put everything in a set, then only start counting up from x when x-1 is absent, so each run is walked exactly once from its true start.",
+    "explanation": "Without the x-1 check every element walks its whole run and the total is O(n^2) on one long run. The guard is what amortises the inner loop to O(n) overall.",
+    "refs": [
+      "LC 128 Longest Consecutive Sequence"
+    ]
+  },
+  {
+    "id": "trees-bst-lca",
+    "title": "LCA in a BST",
+    "kind": "recall",
+    "topic": "trees",
+    "difficulty": "easy",
+    "est_minutes": 2,
+    "prompt": "Lowest common ancestor of p and q in a BST. Why is no recursion into both subtrees needed?",
+    "answer": "Walk from the root: if both values are less than the node go left, if both are greater go right, otherwise the values split here and this node is the LCA.",
+    "explanation": "The BST ordering tells you which side each target is on without searching, so it is a single root-to-node walk, O(h). In a plain binary tree you have no such signal and must search both sides.",
+    "refs": [
+      "LC 235 LCA of a BST",
+      "LC 236 LCA of a Binary Tree"
+    ]
+  },
+  {
+    "id": "window-at-most-k-trick",
+    "title": "Exactly k via at-most k",
+    "kind": "recall",
+    "topic": "sliding-window",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "Counting subarrays with exactly k distinct elements is awkward with one window. What is the standard rewrite?",
+    "answer": "exactly(k) = atMost(k) - atMost(k-1), and atMost is a plain shrinking window because \"at most\" is monotonic in the window size.",
+    "explanation": "\"Exactly\" is not monotonic, so a window cannot decide when to shrink. Turning it into a difference of two monotonic counts is the reusable move behind a whole family of these problems.",
+    "refs": [
+      "LC 992 Subarrays with K Different Integers",
+      "LC 340 Longest Substring with At Most K Distinct"
+    ]
+  },
+  {
+    "id": "complexity-amortized-append",
+    "title": "Cost of append",
+    "kind": "complexity",
+    "topic": "complexity",
+    "difficulty": "easy",
+    "est_minutes": 2,
+    "prompt": "Amortized time per append to a Go slice that doubles its capacity when full?",
+    "answer": "O(1)",
+    "explanation": "A single append that reallocates is O(n), but doubling means n appends copy 1+2+4+...+n < 2n elements total, so the average is constant. Amortized O(1) is not the same as worst-case O(1), which matters if you have latency constraints.",
+    "refs": []
+  },
+  {
+    "id": "matrix-rotate-in-place",
+    "title": "Rotating a matrix in place",
+    "kind": "recall",
+    "topic": "matrix",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "Rotate an n x n matrix 90 degrees clockwise using O(1) extra space. What two passes do it?",
+    "answer": "Transpose (swap m[i][j] with m[j][i] for j > i), then reverse each row. For counter-clockwise, transpose then reverse each column instead.",
+    "explanation": "Decomposing a rotation into two reflections is what avoids the four-way cycle swap and its index arithmetic. The j > i bound matters: looping over all pairs transposes twice and gives you the original back.",
+    "refs": [
+      "LC 48 Rotate Image"
+    ]
+  },
+  {
+    "id": "matrix-grid-bfs-directions",
+    "title": "Marking visited on a grid",
+    "kind": "choice",
+    "topic": "matrix",
+    "difficulty": "easy",
+    "est_minutes": 2,
+    "prompt": "BFS over a grid. When should a cell be marked visited?",
+    "choices": [
+      "When it is pushed onto the queue",
+      "When it is popped off the queue",
+      "After all four neighbours are explored",
+      "Only if it is on the shortest path"
+    ],
+    "answer": "When it is pushed onto the queue",
+    "explanation": "Marking on pop lets the same cell get queued by several neighbours before any of them pops it, which blows the queue up and can revisit cells. Mark on push and each cell enters the queue exactly once.",
+    "refs": [
+      "LC 200 Number of Islands",
+      "LC 542 01 Matrix"
+    ]
+  }
+]

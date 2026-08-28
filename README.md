@@ -8,6 +8,11 @@ The idea: after a break from grinding, what decays first is not your ability to
 code, it is instant recall of *which pattern applies and why it is correct*.
 These drills target that recall directly.
 
+The deck ships 54 drills across 17 topics (hashmap, two-pointers,
+sliding-window, binary-search, stack, heap, linked-list, trees, graphs, matrix,
+intervals, prefix-sum, dp, greedy, backtracking, bit-manipulation, complexity),
+10 of which are machine-graded code drills.
+
 ## Usage
 
 ```
@@ -110,7 +115,15 @@ drills quietly fall back to self-grading rather than failing.
 Drills live in `internal/drill/data/*.json` and are compiled into the binary
 with `go:embed`, so there is nothing to install or configure. Add an object to
 any file in that directory; `go test ./...` validates the whole deck, so a
-malformed drill fails the build rather than a session.
+malformed drill fails the build rather than a session. The deck guards check
+more than the schema: every code drill's model answer must pass its own tests,
+every stub must build without already passing, all embedded Go must be
+gofmt-clean, and no topic may hold fewer than two drills.
+
+One gotcha when writing a code drill: the preamble is compiled as a separate
+file from your solution, so an `import` in the preamble does not cover the
+solution. Either the user writes the import themselves, or the preamble exposes
+a helper that hides it (which is what the intervals drill does with `sort`).
 
 ## Layout
 

@@ -2,6 +2,7 @@ package drill_test
 
 import (
 	"context"
+	"go/format"
 	"strings"
 	"testing"
 
@@ -76,5 +77,50 @@ func TestBuiltinCodeStubsCompile(t *testing.T) {
 				t.Fatalf("stub does not build cleanly:\n%s", res.Output)
 			}
 		})
+	}
+}
+
+// TestBuiltinCodeSourcesAreFormatted keeps embedded Go readable: a stub or model
+// answer printed to the terminal should look like the code the user would write.
+func TestBuiltinCodeSourcesAreFormatted(t *testing.T) {
+	set, err := drill.Builtin()
+	if err != nil {
+		t.Fatalf("Builtin: %v", err)
+	}
+	for _, d := range set.Filter("", drill.KindCode, "") {
+		parts := map[string]string{
+			"stub":     d.Code.Stub,
+			"answer":   d.Answer,
+			"preamble": d.Code.Preamble,
+			"tests":    d.Code.Tests,
+		}
+		for name, src := range parts {
+			if strings.TrimSpace(src) == "" {
+				continue
+			}
+			file := "package lcdrill\n\n" + src + "\n"
+			out, err := format.Source([]byte(file))
+			if err != nil {
+				t.Errorf("%s %s: does not parse: %v", d.ID, name, err)
+				continue
+			}
+			if string(out) != file {
+				t.Errorf("%s %s: not gofmt-formatted", d.ID, name)
+			}
+		}
+	}
+}
+
+// TestBuiltinTopicsAreUsable guards against a topic with a single drill, which
+// makes `-topic` a dead end after one sitting.
+func TestBuiltinTopicsAreUsable(t *testing.T) {
+	set, err := drill.Builtin()
+	if err != nil {
+		t.Fatalf("Builtin: %v", err)
+	}
+	for _, topic := range set.Topics() {
+		if n := len(set.Filter(topic, "", "")); n < 2 {
+			t.Errorf("topic %q has only %d drill(s)", topic, n)
+		}
 	}
 }

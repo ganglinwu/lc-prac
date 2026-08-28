@@ -1,0 +1,131 @@
+[
+  {
+    "id": "window-longest-unique-code",
+    "title": "Longest substring without repeats",
+    "kind": "code",
+    "topic": "sliding-window",
+    "difficulty": "medium",
+    "est_minutes": 6,
+    "prompt": "Implement lengthOfLongestSubstring(s string) int: the length of the longest substring with no repeated character. One pass, O(n).",
+    "code": {
+      "stub": "func lengthOfLongestSubstring(s string) int {\n\t// your code here\n\treturn 0\n}",
+      "tests": "import \"testing\"\n\nfunc TestLengthOfLongestSubstring(t *testing.T) {\n\tcases := []struct {\n\t\tin   string\n\t\twant int\n\t}{\n\t\t{\"abcabcbb\", 3},\n\t\t{\"bbbbb\", 1},\n\t\t{\"pwwkew\", 3},\n\t\t{\"\", 0},\n\t\t{\"au\", 2},\n\t\t{\"dvdf\", 3},\n\t\t{\"tmmzuxt\", 5},\n\t}\n\tfor _, c := range cases {\n\t\tif got := lengthOfLongestSubstring(c.in); got != c.want {\n\t\t\tt.Fatalf(\"lengthOfLongestSubstring(%q) = %d, want %d\", c.in, got, c.want)\n\t\t}\n\t}\n}"
+    },
+    "answer": "func lengthOfLongestSubstring(s string) int {\n\tlast := make(map[byte]int)\n\tbest, left := 0, 0\n\tfor r := 0; r < len(s); r++ {\n\t\tif j, ok := last[s[r]]; ok && j >= left {\n\t\t\tleft = j + 1\n\t\t}\n\t\tlast[s[r]] = r\n\t\tif r-left+1 > best {\n\t\t\tbest = r - left + 1\n\t\t}\n\t}\n\treturn best\n}",
+    "explanation": "The window is valid when it holds no duplicate. Jumping left to j+1 (never backwards, hence the j >= left guard) is what keeps it O(n): \"dvdf\" is the case that catches a left pointer that moves back.",
+    "refs": [
+      "LC 3 Longest Substring Without Repeating Characters"
+    ]
+  },
+  {
+    "id": "stack-valid-parens-code",
+    "title": "Balanced brackets",
+    "kind": "code",
+    "topic": "stack",
+    "difficulty": "easy",
+    "est_minutes": 5,
+    "prompt": "Implement isValid(s string) bool for a string of ()[]{}: brackets must close in the right order.",
+    "code": {
+      "stub": "func isValid(s string) bool {\n\t// your code here\n\treturn false\n}",
+      "tests": "import \"testing\"\n\nfunc TestIsValid(t *testing.T) {\n\tcases := []struct {\n\t\tin   string\n\t\twant bool\n\t}{\n\t\t{\"()\", true},\n\t\t{\"()[]{}\", true},\n\t\t{\"(]\", false},\n\t\t{\"([)]\", false},\n\t\t{\"{[]}\", true},\n\t\t{\"\", true},\n\t\t{\"(\", false},\n\t\t{\")\", false},\n\t\t{\"]\", false},\n\t}\n\tfor _, c := range cases {\n\t\tif got := isValid(c.in); got != c.want {\n\t\t\tt.Fatalf(\"isValid(%q) = %v, want %v\", c.in, got, c.want)\n\t\t}\n\t}\n}"
+    },
+    "answer": "func isValid(s string) bool {\n\tpairs := map[byte]byte{')': '(', ']': '[', '}': '{'}\n\tstack := []byte{}\n\tfor i := 0; i < len(s); i++ {\n\t\tc := s[i]\n\t\tif open, ok := pairs[c]; ok {\n\t\t\tif len(stack) == 0 || stack[len(stack)-1] != open {\n\t\t\t\treturn false\n\t\t\t}\n\t\t\tstack = stack[:len(stack)-1]\n\t\t} else {\n\t\t\tstack = append(stack, c)\n\t\t}\n\t}\n\treturn len(stack) == 0\n}",
+    "explanation": "Two failure modes, and both need a check: a closer with the wrong (or no) top, and leftovers on the stack at the end. Dropping the second one makes \"(\" pass.",
+    "refs": [
+      "LC 20 Valid Parentheses"
+    ]
+  },
+  {
+    "id": "linkedlist-reverse-code",
+    "title": "Reverse a linked list",
+    "kind": "code",
+    "topic": "linked-list",
+    "difficulty": "easy",
+    "est_minutes": 5,
+    "prompt": "Implement reverseList(head *ListNode) *ListNode in place, iteratively. ListNode, buildList and listVals are already defined for you.",
+    "code": {
+      "preamble": "type ListNode struct {\n\tVal  int\n\tNext *ListNode\n}\n\nfunc buildList(vals []int) *ListNode {\n\tdummy := &ListNode{}\n\tcur := dummy\n\tfor _, v := range vals {\n\t\tcur.Next = &ListNode{Val: v}\n\t\tcur = cur.Next\n\t}\n\treturn dummy.Next\n}\n\nfunc listVals(head *ListNode) []int {\n\tout := []int{}\n\tfor n := head; n != nil; n = n.Next {\n\t\tout = append(out, n.Val)\n\t}\n\treturn out\n}",
+      "stub": "func reverseList(head *ListNode) *ListNode {\n\t// your code here\n\treturn nil\n}",
+      "tests": "import (\n\t\"reflect\"\n\t\"testing\"\n)\n\nfunc TestReverseList(t *testing.T) {\n\tcases := []struct{ in, want []int }{\n\t\t{[]int{1, 2, 3, 4, 5}, []int{5, 4, 3, 2, 1}},\n\t\t{[]int{1, 2}, []int{2, 1}},\n\t\t{[]int{1}, []int{1}},\n\t\t{[]int{}, []int{}},\n\t}\n\tfor _, c := range cases {\n\t\tgot := listVals(reverseList(buildList(c.in)))\n\t\tif !reflect.DeepEqual(got, c.want) {\n\t\t\tt.Fatalf(\"reverseList(%v) = %v, want %v\", c.in, got, c.want)\n\t\t}\n\t}\n}"
+    },
+    "answer": "func reverseList(head *ListNode) *ListNode {\n\tvar prev *ListNode\n\tcur := head\n\tfor cur != nil {\n\t\tnext := cur.Next\n\t\tcur.Next = prev\n\t\tprev = cur\n\t\tcur = next\n\t}\n\treturn prev\n}",
+    "explanation": "Three pointers, and the order is the whole drill: save next before you clobber cur.Next, then walk prev and cur forward. You return prev, not cur, because the loop exits with cur == nil.",
+    "refs": [
+      "LC 206 Reverse Linked List"
+    ]
+  },
+  {
+    "id": "trees-valid-bst-code",
+    "title": "Validate a BST with bounds",
+    "kind": "code",
+    "topic": "trees",
+    "difficulty": "medium",
+    "est_minutes": 6,
+    "prompt": "Implement isValidBST(root *TreeNode) bool. Every node in the left subtree must be strictly less than the node, every node on the right strictly greater, all the way down. TreeNode is already defined.",
+    "code": {
+      "preamble": "type TreeNode struct {\n\tVal   int\n\tLeft  *TreeNode\n\tRight *TreeNode\n}",
+      "stub": "func isValidBST(root *TreeNode) bool {\n\t// your code here\n\treturn false\n}",
+      "tests": "import \"testing\"\n\nfunc TestIsValidBST(t *testing.T) {\n\tvalid := &TreeNode{Val: 2,\n\t\tLeft:  &TreeNode{Val: 1},\n\t\tRight: &TreeNode{Val: 3}}\n\tif !isValidBST(valid) {\n\t\tt.Fatal(\"[2,1,3] should be a valid BST\")\n\t}\n\tif !isValidBST(nil) {\n\t\tt.Fatal(\"empty tree should be a valid BST\")\n\t}\n\tbadChild := &TreeNode{Val: 5,\n\t\tLeft:  &TreeNode{Val: 1},\n\t\tRight: &TreeNode{Val: 4, Left: &TreeNode{Val: 3}, Right: &TreeNode{Val: 6}}}\n\tif isValidBST(badChild) {\n\t\tt.Fatal(\"[5,1,4,null,null,3,6] is not a valid BST\")\n\t}\n\t// Locally fine at every parent, but 4 sits in the left subtree of 5.\n\tdeepViolation := &TreeNode{Val: 5,\n\t\tLeft:  &TreeNode{Val: 3, Left: &TreeNode{Val: 2}, Right: &TreeNode{Val: 4}},\n\t\tRight: &TreeNode{Val: 8, Left: &TreeNode{Val: 4}, Right: &TreeNode{Val: 9}}}\n\tif isValidBST(deepViolation) {\n\t\tt.Fatal(\"a node violating an ancestor bound must be rejected\")\n\t}\n\tif isValidBST(&TreeNode{Val: 1, Left: &TreeNode{Val: 1}}) {\n\t\tt.Fatal(\"equal values are not allowed in a strict BST\")\n\t}\n}"
+    },
+    "answer": "func isValidBST(root *TreeNode) bool {\n\tvar check func(n *TreeNode, lo, hi *int) bool\n\tcheck = func(n *TreeNode, lo, hi *int) bool {\n\t\tif n == nil {\n\t\t\treturn true\n\t\t}\n\t\tif lo != nil && n.Val <= *lo {\n\t\t\treturn false\n\t\t}\n\t\tif hi != nil && n.Val >= *hi {\n\t\t\treturn false\n\t\t}\n\t\treturn check(n.Left, lo, &n.Val) && check(n.Right, &n.Val, hi)\n\t}\n\treturn check(root, nil, nil)\n}",
+    "explanation": "Comparing each node only with its two children is the classic wrong answer: it accepts a 4 buried in the right subtree of 5. Correctness needs an inherited (lo, hi) range that narrows on the way down.",
+    "refs": [
+      "LC 98 Validate Binary Search Tree"
+    ]
+  },
+  {
+    "id": "dp-house-robber-code",
+    "title": "House robber in O(1) space",
+    "kind": "code",
+    "topic": "dp",
+    "difficulty": "medium",
+    "est_minutes": 5,
+    "prompt": "Implement rob(nums []int) int: the maximum sum of a subset of nums with no two adjacent elements. Use two rolling variables, not a table.",
+    "code": {
+      "stub": "func rob(nums []int) int {\n\t// your code here\n\treturn 0\n}",
+      "tests": "import \"testing\"\n\nfunc TestRob(t *testing.T) {\n\tcases := []struct {\n\t\tin   []int\n\t\twant int\n\t}{\n\t\t{[]int{1, 2, 3, 1}, 4},\n\t\t{[]int{2, 7, 9, 3, 1}, 12},\n\t\t{[]int{}, 0},\n\t\t{[]int{5}, 5},\n\t\t{[]int{2, 1, 1, 2}, 4},\n\t}\n\tfor _, c := range cases {\n\t\tif got := rob(c.in); got != c.want {\n\t\t\tt.Fatalf(\"rob(%v) = %d, want %d\", c.in, got, c.want)\n\t\t}\n\t}\n}"
+    },
+    "answer": "func rob(nums []int) int {\n\tprev, cur := 0, 0\n\tfor _, v := range nums {\n\t\ttake := prev + v\n\t\tif take < cur {\n\t\t\ttake = cur\n\t\t}\n\t\tprev, cur = cur, take\n\t}\n\treturn cur\n}",
+    "explanation": "cur is the best over houses 0..i, prev the best over 0..i-1. Each house is max(skip = cur, take = prev+v). [2,1,1,2] is the case that catches a greedy \"alternate houses\" solution.",
+    "refs": [
+      "LC 198 House Robber"
+    ]
+  },
+  {
+    "id": "intervals-merge-code",
+    "title": "Merge overlapping intervals",
+    "kind": "code",
+    "topic": "intervals",
+    "difficulty": "medium",
+    "est_minutes": 6,
+    "prompt": "Implement merge(intervals [][]int) [][]int, each interval a [start, end] pair, returning the merged set sorted by start. Touching intervals like [1,4] and [4,5] merge. A sortByStart(intervals) helper is already defined for you.",
+    "code": {
+      "stub": "func merge(intervals [][]int) [][]int {\n\t// your code here\n\treturn nil\n}",
+      "tests": "import (\n\t\"reflect\"\n\t\"testing\"\n)\n\nfunc TestMerge(t *testing.T) {\n\tcases := []struct{ in, want [][]int }{\n\t\t{[][]int{{1, 3}, {2, 6}, {8, 10}, {15, 18}}, [][]int{{1, 6}, {8, 10}, {15, 18}}},\n\t\t{[][]int{{1, 4}, {4, 5}}, [][]int{{1, 5}}},\n\t\t{[][]int{{1, 4}, {2, 3}}, [][]int{{1, 4}}},\n\t\t{[][]int{{5, 6}, {1, 2}}, [][]int{{1, 2}, {5, 6}}},\n\t\t{[][]int{{1, 4}}, [][]int{{1, 4}}},\n\t}\n\tfor _, c := range cases {\n\t\tgot := merge(c.in)\n\t\tif !reflect.DeepEqual(got, c.want) {\n\t\t\tt.Fatalf(\"merge = %v, want %v\", got, c.want)\n\t\t}\n\t}\n}",
+      "preamble": "import \"sort\"\n\n// sortByStart orders intervals ascending by start, in place.\nfunc sortByStart(intervals [][]int) {\n\tsort.Slice(intervals, func(i, j int) bool { return intervals[i][0] < intervals[j][0] })\n}"
+    },
+    "answer": "func merge(intervals [][]int) [][]int {\n\tsortByStart(intervals)\n\tout := [][]int{}\n\tfor _, iv := range intervals {\n\t\tn := len(out)\n\t\tif n > 0 && iv[0] <= out[n-1][1] {\n\t\t\tif iv[1] > out[n-1][1] {\n\t\t\t\tout[n-1][1] = iv[1]\n\t\t\t}\n\t\t\tcontinue\n\t\t}\n\t\tout = append(out, []int{iv[0], iv[1]})\n\t}\n\treturn out\n}",
+    "explanation": "Sorting by start is what makes a single pass enough: any interval that overlaps the running one must start inside it. The two traps are [1,4],[2,3] (the new end can be smaller, so take the max) and forgetting that <= merges touching intervals.",
+    "refs": [
+      "LC 56 Merge Intervals"
+    ]
+  },
+  {
+    "id": "prefix-subarray-sum-k-code",
+    "title": "Count subarrays summing to k",
+    "kind": "code",
+    "topic": "prefix-sum",
+    "difficulty": "medium",
+    "est_minutes": 6,
+    "prompt": "Implement subarraySum(nums []int, k int) int: how many contiguous subarrays sum to exactly k. Values may be negative, so a sliding window will not work. O(n).",
+    "code": {
+      "stub": "func subarraySum(nums []int, k int) int {\n\t// your code here\n\treturn 0\n}",
+      "tests": "import \"testing\"\n\nfunc TestSubarraySum(t *testing.T) {\n\tcases := []struct {\n\t\tnums []int\n\t\tk    int\n\t\twant int\n\t}{\n\t\t{[]int{1, 1, 1}, 2, 2},\n\t\t{[]int{1, 2, 3}, 3, 2},\n\t\t{[]int{3, 4, 7, 2, -3, 1, 4, 2}, 7, 4},\n\t\t{[]int{1, -1, 0}, 0, 3},\n\t\t{[]int{1}, 1, 1},\n\t\t{[]int{1}, 2, 0},\n\t}\n\tfor _, c := range cases {\n\t\tif got := subarraySum(c.nums, c.k); got != c.want {\n\t\t\tt.Fatalf(\"subarraySum(%v, %d) = %d, want %d\", c.nums, c.k, got, c.want)\n\t\t}\n\t}\n}"
+    },
+    "answer": "func subarraySum(nums []int, k int) int {\n\tcounts := map[int]int{0: 1}\n\tsum, total := 0, 0\n\tfor _, v := range nums {\n\t\tsum += v\n\t\ttotal += counts[sum-k]\n\t\tcounts[sum]++\n\t}\n\treturn total\n}",
+    "explanation": "sum(i..j) == prefix[j] - prefix[i-1], so each running sum asks how many earlier prefixes equal sum-k. The seed counts[0] = 1 is the empty prefix, and without it every subarray starting at index 0 is missed.",
+    "refs": [
+      "LC 560 Subarray Sum Equals K"
+    ]
+  }
+]
