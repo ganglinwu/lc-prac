@@ -21,6 +21,7 @@ go run ./cmd/lcprac drill -m 15          # a 15 minute session
 go run ./cmd/lcprac drill -topic dp      # only dynamic programming
 go run ./cmd/lcprac drill -weak         # aim the session at your weakest topic
 go run ./cmd/lcprac drill -leech        # only the drills you keep missing
+go run ./cmd/lcprac drill -problem 56   # warm up on the drills behind LC 56
 go run ./cmd/lcprac drill -seed 42       # reproducible selection
 go run ./cmd/lcprac drill -tries 1       # code drills: one shot, then the answer
 go run ./cmd/lcprac list                 # every drill, no session
@@ -106,8 +107,8 @@ clears it along with the drill history.
 
 ## Aiming a session
 
-Two flags spend a whole sitting on what your history says is weak, so you do
-not have to read `stats` and copy a topic across:
+Three flags aim a whole sitting, so you do not have to read `stats` and copy a
+topic across:
 
 - `-weak` picks the same topic `next up` names and prints why it picked it
   (the accuracy it is going on, or the coverage gap when there is no accuracy
@@ -115,6 +116,8 @@ not have to read `stats` and copy a topic across:
 - `-leech` narrows the deck to the drills that keep beating you, the same set
   `lcprac review` reads out. Use it when you want to be quizzed on them rather
   than to reread them.
+- `-problem` narrows the deck to the drills behind one real problem, matched by
+  number or by part of its title. See [Back to the real problems](#back-to-the-real-problems).
 
 Both can be combined, in which case `-weak` picks the weakest topic among the
 leeches. Neither is an error on a thin history: with no leeches, or not enough
@@ -205,6 +208,19 @@ you get wrong, then the ones you have never drilled, then the ones you are
 solid on. Each row shows how many drills back the problem and your accuracy
 across all of them, and the tally underneath covers every problem, not just the
 rows shown. `lcprac stats` names the top one and points here.
+
+Going the other way, `lcprac drill -problem` spends a sitting on the drills
+behind one real problem, so you can warm up on the pattern right before you
+attempt it:
+
+```
+lcprac drill -problem 56          # the drills behind LC 56 Merge Intervals
+lcprac drill -problem "two sum"   # match on part of the title instead
+```
+
+A bare number has to be the problem's own number, so `-problem 34` does not
+drag in LC 340. Unlike `-weak` and `-leech`, a problem nothing matches is an
+error rather than a random session, so a typo never quietly costs you a sitting.
 
 ## Drill kinds
 

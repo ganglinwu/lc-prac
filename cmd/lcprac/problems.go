@@ -161,7 +161,7 @@ func writeProblems(w io.Writer, rows []problemRow, n int) {
 		len(rows), weak, untried, solid)
 	if len(shown) > 0 {
 		top := shown[0]
-		fmt.Fprintf(w, "next up: attempt %s for real, or `lcprac drill -topic %s` first.\n", top.Ref, top.Topics[0])
+		fmt.Fprintf(w, "next up: attempt %s for real, or `lcprac drill %s` to warm up first.\n", top.Ref, warmUpFlag(top))
 	}
 }
 
@@ -172,4 +172,13 @@ func problemMark(p problemRow) string {
 		return "not drilled yet"
 	}
 	return fmt.Sprintf("%d%% over %d attempt(s)", p.Accuracy(), p.Seen)
+}
+
+// warmUpFlag is the drill invocation that warms you up for a problem: by
+// number when the ref carries one, otherwise by its main topic.
+func warmUpFlag(p problemRow) string {
+	if n := problemNumber(p.Ref); n != "" {
+		return "-problem " + n
+	}
+	return "-topic " + p.Topics[0]
 }

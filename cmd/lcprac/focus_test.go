@@ -179,3 +179,119 @@ func TestNarrowDeckKeepsExplicitTopic(t *testing.T) {
 		t.Errorf("output = %q", out.String())
 	}
 }
+
+func refDeck(t *testing.T) *drill.Set {
+	t.Helper()
+	mk := func(id, topic string, refs ...string) drill.Drill {
+		return drill.Drill{
+			ID: id, Title: id, Topic: topic, Kind: drill.KindRecall,
+			Difficulty: drill.Easy, Prompt: "p?", Answer: "a",
+			Explanation: "because", EstMinutes: 2, Refs: refs,
+		}
+	}
+	set, err := drill.NewSet([]drill.Drill{
+		mk("iv-1", "intervals", "LC 56 Merge Intervals"),
+		mk("iv-2", "intervals", "LC 56 Merge Intervals", "LC 435 Non-overlapping Intervals"),
+		mk("bs-1", "binary-search", "LC 34 Find First and Last Position"),
+		mk("bs-2", "binary-search", "LC 340 Longest Substring with At Most K Distinct"),
+		mk("cx-1", "complexity"),
+	})
+	if err != nil {
+		t.Fatalf("NewSet: %v", err)
+	}
+	return set
+}
+
+func TestMatchesProblem(t *testing.T) {
+	cases := []struct {
+		ref, query string
+		want       bool
+	}{
+		{"LC 56 Merge Intervals", "56", true},
+		{"LC 56 Merge Intervals", "lc 56", true},
+		{"LC 56 Merge Intervals", "LC56", true},
+		{"LC 340 Longest Substring", "34", false},
+		{"LC 34 Find First and Last", "34", true},
+		{"LC 56 Merge Intervals", "merge", true},
+		{"LC 56 Merge Intervals", "MERGE INTERVALS", true},
+		{"LC 56 Merge Intervals", "islands", false},
+		{"LC 56 Merge Intervals", "  ", false},
+	}
+	for _, c := range cases {
+		if got := matchesProblem(c.ref, c.query); got != c.want {
+			t.Errorf("matchesProblem(%q, %q) = %v, want %v", c.ref, c.query, got, c.want)
+		}
+	}
+}
+
+func TestProblemDeckByNumber(t *testing.T) {
+	var buf bytes.Buffer
+	sub, err := problemDeck(refDeck(t), "56", &buf)
+	if err != nil {
+		t.Fatalf("problemDeck: %v", err)
+	}
+	if sub.Len() != 2 {
+		t.Fatalf("got %d drills, want 2", sub.Len())
+	}
+	for _, id := range []string{"iv-1", "iv-2"} {
+		if _, ok := sub.ByID(id); !ok {
+			t.Errorf("missing %s", id)
+		}
+	}
+	if out := buf.String(); !strings.Contains(out, "LC 56 Merge Intervals") || !strings.Contains(out, "2 drill(s)") {
+		t.Errorf("report did not name the problem and count: %q", out)
+	}
+}
+
+// A drill counts once even when several of its refs match, and a match on a
+// second ref is enough to pull it in.
+func TestProblemDeckByTitle(t *testing.T) {
+	var buf bytes.Buffer
+	sub, err := problemDeck(refDeck(t), "intervals", &buf)
+	if err != nil {
+		t.Fatalf("problemDeck: %v", err)
+	}
+	if sub.Len() != 2 {
+		t.Fatalf("got %d drills, want 2", sub.Len())
+	}
+	if out := buf.String(); !strings.Contains(out, "LC 435") {
+		t.Errorf("report should list every matched ref: %q", out)
+	}
+}
+
+func TestProblemDeckNoMatch(t *testing.T) {
+	var buf bytes.Buffer
+	if _, err := problemDeck(refDeck(t), "999", &buf); err == nil {
+		t.Fatal("want an error when no drill names the problem")
+	} else if !strings.Contains(err.Error(), "lcprac problems") {
+		t.Errorf("error should point at the problem list: %v", err)
+	}
+	if buf.Len() != 0 {
+		t.Errorf("nothing should be reported on a miss: %q", buf.String())
+	}
+}
+
+func TestWarmUpFlag(t *testing.T) {
+	if got := warmUpFlag(problemRow{Ref: "LC 56 Merge Intervals", Topics: []string{"intervals"}}); got != "-problem 56" {
+		t.Errorf("got %q, want -problem 56", got)
+	}
+	if got := warmUpFlag(problemRow{Ref: "Blind 75 warmup", Topics: []string{"dp"}}); got != "-topic dp" {
+		t.Errorf("got %q, want -topic dp", got)
+	}
+}
+
+// The builtin deck has to actually answer a number, otherwise the flag is
+// only usable against hand-written drills.
+func TestProblemDeckBuiltin(t *testing.T) {
+	set, err := drill.Builtin()
+	if err != nil {
+		t.Fatalf("Builtin: %v", err)
+	}
+	sub, err := problemDeck(set, "56", &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("problemDeck: %v", err)
+	}
+	if sub.Len() == 0 {
+		t.Fatal("LC 56 should be backed by at least one builtin drill")
+	}
+}

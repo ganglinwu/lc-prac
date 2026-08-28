@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"io"
+	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ganglinwu/lc-prac/internal/drill"
@@ -95,4 +98,71 @@ func narrowDeck(set *drill.Set, store *progress.Store, now time.Time, w io.Write
 		fmt.Fprintf(w, "-weak ignored: -topic %s was given.\n", topic)
 	}
 	return set, topic, nil
+}
+
+// problemNumber returns the LeetCode number a ref leads with, or "" when it
+// does not start with one. Refs read "LC 56 Merge Intervals".
+func problemNumber(ref string) string {
+	for _, f := range strings.Fields(ref) {
+		if strings.EqualFold(f, "lc") {
+			continue
+		}
+		if _, err := strconv.Atoi(strings.TrimSuffix(f, ".")); err == nil {
+			return strings.TrimSuffix(f, ".")
+		}
+		return ""
+	}
+	return ""
+}
+
+// matchesProblem reports whether a ref answers the query. A bare number has
+// to be the problem's own number, so "34" does not drag in LC 340; anything
+// else is a case-insensitive substring of the title.
+func matchesProblem(ref, query string) bool {
+	q := strings.ToLower(strings.TrimSpace(query))
+	q = strings.TrimSpace(strings.TrimPrefix(q, "lc"))
+	if q == "" {
+		return false
+	}
+	if _, err := strconv.Atoi(q); err == nil {
+		n := problemNumber(ref)
+		return n != "" && strings.TrimLeft(n, "0") == strings.TrimLeft(q, "0")
+	}
+	return strings.Contains(strings.ToLower(ref), q)
+}
+
+// problemDeck narrows the deck to the drills behind one real problem, so a
+// warm-up can be aimed at the question you are about to attempt. Unlike
+// -weak and -leech this is fatal when nothing matches: a typo'd problem
+// should not quietly become a random session.
+func problemDeck(set *drill.Set, query string, w io.Writer) (*drill.Set, error) {
+	var ds []drill.Drill
+	seen := map[string]bool{}
+	var refs []string
+	for _, d := range set.All() {
+		hit := false
+		for _, ref := range d.Refs {
+			if !matchesProblem(ref, query) {
+				continue
+			}
+			hit = true
+			if !seen[ref] {
+				seen[ref] = true
+				refs = append(refs, ref)
+			}
+		}
+		if hit {
+			ds = append(ds, d)
+		}
+	}
+	if len(ds) == 0 {
+		return nil, fmt.Errorf("no drill names a problem matching %q; try `lcprac problems -all` to see them", query)
+	}
+	sort.Strings(refs)
+	sub, err := drill.NewSet(ds)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Fprintf(w, "warming up on %s: %d drill(s).\n", strings.Join(refs, ", "), sub.Len())
+	return sub, nil
 }

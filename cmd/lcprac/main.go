@@ -61,13 +61,15 @@ func run(args []string) error {
 func usage() {
 	fmt.Fprint(os.Stderr, `lcprac - short LeetCode pattern drills
 
-  lcprac drill [-m 12] [-topic X] [-kind K] [-diff D] [-seed N] [-noretry] [-nolimit] [-tries 3] [-builtin] [-weak] [-leech]
+  lcprac drill [-m 12] [-topic X] [-kind K] [-diff D] [-seed N] [-noretry] [-nolimit] [-tries 3] [-builtin] [-weak] [-leech] [-problem X]
       Run a timed session that fits the minute budget (default 12). The clock
       is real: once the budget is spent no new drill starts. -nolimit disables
       that and lets the session run long. A failed code drill offers another
       try (3 by default, -tries changes it) before revealing the answer.
       -weak aims the session at your weakest topic and -leech at the drills
       you keep missing; both fall back to a normal session if history is thin.
+      -problem warms you up on the drills behind one real problem before you
+      attempt it: give a number or part of a title, e.g. -problem 56.
   lcprac list [-topic X] [-kind K] [-diff D] [-builtin]
       List matching drills without running them. Yours are marked *.
   lcprac topics
@@ -146,6 +148,7 @@ func cmdDrill(args []string) error {
 	builtinOnly := fs.Bool("builtin", false, "use only the builtin deck, ignoring your own drills")
 	weak := fs.Bool("weak", false, "spend the session on your weakest topic")
 	leech := fs.Bool("leech", false, "spend the session on the drills you keep missing")
+	problem := fs.String("problem", "", "spend the session on the drills behind one real problem")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -155,6 +158,11 @@ func cmdDrill(args []string) error {
 		return err
 	}
 	store := openStore()
+	if *problem != "" {
+		if set, err = problemDeck(set, *problem, os.Stdout); err != nil {
+			return err
+		}
+	}
 	if *weak || *leech {
 		set, *topic, err = narrowDeck(set, store, time.Now(), os.Stdout, *leech, *weak, *topic)
 		if err != nil {
