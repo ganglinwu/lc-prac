@@ -29,6 +29,7 @@ go run ./cmd/lcprac stats                # accuracy, streak, recent sessions, wh
 go run ./cmd/lcprac review               # reread the drills that keep beating you
 go run ./cmd/lcprac review -code         # your own saved code, next to the model answer
 go run ./cmd/lcprac pace                 # how long drills take you vs their estimate
+go run ./cmd/lcprac problems             # the real problems behind the deck, weakest first
 go run ./cmd/lcprac note <id> <words>    # keep your own wording on a drill
 go run ./cmd/lcprac add                  # write a drill of your own, one prompt at a time
 go run ./cmd/lcprac mine                 # your own drills and where they live
@@ -185,6 +186,25 @@ estimate. `lcprac stats` names the single worst offender and points here.
 
 Time is only recorded for drills you actually answered: a skipped drill and a
 note-only drill both stay untimed.
+
+## Back to the real problems
+
+A drill is a slice of a LeetCode problem, and every drill names the problems it
+was cut from. `lcprac problems` folds those refs together so a refresher can end
+with one full problem to attempt:
+
+```
+lcprac problems               # the 10 you are weakest on
+lcprac problems -all          # every problem the deck points at
+lcprac problems -topic dp     # only problems whose drills are dp
+lcprac problems -n 3          # a shorter list
+```
+
+Rows are ordered the way you would work through them: the problems whose drills
+you get wrong, then the ones you have never drilled, then the ones you are
+solid on. Each row shows how many drills back the problem and your accuracy
+across all of them, and the tally underneath covers every problem, not just the
+rows shown. `lcprac stats` names the top one and points here.
 
 ## Drill kinds
 

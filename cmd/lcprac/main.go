@@ -47,6 +47,8 @@ func run(args []string) error {
 		return cmdNote(args)
 	case "pace":
 		return cmdPace(args)
+	case "problems":
+		return cmdProblems(args)
 	case "help", "-h", "--help":
 		usage()
 		return nil
@@ -80,6 +82,9 @@ func usage() {
   lcprac pace [-n 8] [-topic X] [-all]
       Show how long drills actually take you against their estimate, slowest
       first, plus how many fit a 12 minute sitting.
+  lcprac problems [-n 10] [-topic X] [-all]
+      Show the real LeetCode problems the deck's drills came from, weakest
+      first, so a refresher can end with one to attempt in full.
   lcprac note [id] [your words] [-clear]
       Keep your own wording on a drill. It is shown when the drill comes back
       and in review. With no id it lists every note you have written.
@@ -358,6 +363,9 @@ func cmdStats(args []string) error {
 	}
 	if next := focus(stats); next != "" {
 		fmt.Printf("next up: lcprac drill -weak  (that is %s right now)\n", next)
+	}
+	if rows := problemRows(set, store, ""); len(rows) > 0 && rows[0].tier() == 0 {
+		fmt.Printf("ready for the real thing: %s: lcprac problems\n", rows[0].Ref)
 	}
 	printSessions(store, now)
 	fmt.Printf("history: %s\n", path)
