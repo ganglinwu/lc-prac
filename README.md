@@ -20,6 +20,7 @@ go run ./cmd/lcprac                      # a ~12 minute session
 go run ./cmd/lcprac drill -m 15          # a 15 minute session
 go run ./cmd/lcprac drill -topic dp      # only dynamic programming
 go run ./cmd/lcprac drill -seed 42       # reproducible selection
+go run ./cmd/lcprac drill -tries 1       # code drills: one shot, then the answer
 go run ./cmd/lcprac list                 # every drill, no session
 go run ./cmd/lcprac topics               # topics and their drill counts
 go run ./cmd/lcprac stats                # accuracy, streak, recent sessions, what is due
@@ -145,9 +146,28 @@ e to open $EDITOR, or type your code and end with a line "." (s to skip):
 
 Type the function and finish with a line containing only `.` (Ctrl-D works
 too), or press `e` to open `$EDITOR` on the stub. On a pass it says so and
-moves on; on a failure you see the actual `go test` output and then the working
-version. A run that never terminates is killed after 30 seconds and counts as a
-miss.
+moves on; on a failure you see the actual `go test` output and are offered
+another try. A run that never terminates is killed after 30 seconds and counts
+as a failed try.
+
+### Fixing it yourself
+
+A failed compile does not end the drill. After the test output you get:
+
+```
+r to fix it (2 tries left), anything else to give up:
+```
+
+`r` re-opens entry seeded with what you just wrote (`e` in the editor opens
+your last version, not the stub), so a missing return or an off-by-one costs
+you a try rather than the drill. Reading the failing test and repairing your
+own code is most of the value, which is why the working version is only shown
+once you give up or run out of tries. Three tries by default; `-tries N`
+changes it, and `h` still works at the retry prompt.
+
+Solving on the second or third try still counts as a solve and advances the
+repetition ladder: you got there yourself. The summary shows the try count next
+to the drill.
 
 The generated module has no dependencies and is built with `GOPROXY=off`, so
 grading is offline and cannot pull anything. Your source lands in its own file,

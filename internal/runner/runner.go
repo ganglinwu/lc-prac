@@ -23,6 +23,11 @@ import (
 // never collide with a line the user meant to keep.
 const endMarker = "."
 
+// defaultCodeAttempts is how many times a code drill may be compiled before
+// the answer is revealed. A typo should not cost you the drill, but an
+// unbounded loop would eat the session's minutes.
+const defaultCodeAttempts = 3
+
 // Result records how one drill went.
 type Result struct {
 	Drill   drill.Drill
@@ -30,8 +35,11 @@ type Result struct {
 	Skipped bool
 	// Hints counts the nudges revealed before answering. A correct answer
 	// with hints is real progress, but weaker than an unaided one.
-	Hints   int
-	Elapsed time.Duration
+	Hints int
+	// Attempts counts compile-and-run tries on a code drill. Zero on every
+	// other kind.
+	Attempts int
+	Elapsed  time.Duration
 }
 
 // Report is the tally for a whole session. Retries holds the second-pass
@@ -88,6 +96,9 @@ type Runner struct {
 	Grade func(context.Context, codecheck.Program) (codecheck.Result, error)
 	// Editor composes code in an external editor. Nil disables the [e] option.
 	Editor func(initial string) (string, error)
+	// CodeAttempts caps the tries allowed on one code drill before the
+	// working version is revealed. Zero means defaultCodeAttempts.
+	CodeAttempts int
 }
 
 // New builds a Runner over the given streams.
@@ -201,22 +212,14 @@ func (r *Runner) runOne(label string, d drill.Drill) (Result, error) {
 	}
 
 	machineGraded := d.Kind == drill.KindCode && !r.selfGrades(d)
-	keys := "s to skip"
-	if len(d.Hints) > 0 {
-		keys = "h for a hint, s to skip"
-	}
 	prompt := func() {
 		switch {
 		case machineGraded:
-			if r.Editor != nil {
-				fmt.Fprintf(r.out, "\ne to open $EDITOR, or type your code and end with a line \"%s\" (%s): ", endMarker, keys)
-			} else {
-				fmt.Fprintf(r.out, "\nType your code and end with a line \"%s\" (%s): ", endMarker, keys)
-			}
+			r.codePrompt(d)()
 		case r.selfGrades(d):
-			fmt.Fprintf(r.out, "\nThink it through, then press enter to reveal (%s): ", keys)
+			fmt.Fprintf(r.out, "\nThink it through, then press enter to reveal (%s): ", answerKeys(d))
 		default:
-			fmt.Fprintf(r.out, "\nYour answer (%s): ", keys)
+			fmt.Fprintf(r.out, "\nYour answer (%s): ", answerKeys(d))
 		}
 	}
 	if machineGraded {
@@ -236,11 +239,13 @@ func (r *Runner) runOne(label string, d drill.Drill) (Result, error) {
 	}
 
 	if machineGraded {
-		correct, err := r.gradeCode(d, input)
+		out, err := r.gradeCode(d, input)
 		if err != nil {
 			return Result{}, err
 		}
-		res.Correct = correct
+		res.Correct = out.correct
+		res.Attempts = out.attempts
+		res.Hints += out.hints
 		fmt.Fprintf(r.out, "\n%s\n", d.Explanation)
 	} else if r.selfGrades(d) {
 		fmt.Fprintf(r.out, "\nanswer: %s\n\n%s\n", d.Answer, d.Explanation)
@@ -292,49 +297,138 @@ func (r *Runner) readAnswer(d drill.Drill, prompt func()) (string, int, error) {
 	}
 }
 
-// gradeCode collects the user's source, compiles it against the drill's tests
-// and reports whether it passed. first is the line already consumed by runOne:
-// "e" opens the editor, anything else is the first line of inline entry.
-func (r *Runner) gradeCode(d drill.Drill, first string) (bool, error) {
-	var src string
-	if strings.EqualFold(strings.TrimSpace(first), "e") && r.Editor != nil {
-		edited, err := r.Editor(d.Code.Stub)
+// answerKeys lists the single-letter keys the prompt should advertise. The
+// hint key is only mentioned on drills that carry hints, so "h" stays an
+// ordinary answer everywhere else.
+func answerKeys(d drill.Drill) string {
+	if len(d.Hints) > 0 {
+		return "h for a hint, s to skip"
+	}
+	return "s to skip"
+}
+
+// codePrompt returns the code-entry prompt, reused for every attempt.
+func (r *Runner) codePrompt(d drill.Drill) func() {
+	return func() {
+		if r.Editor != nil {
+			fmt.Fprintf(r.out, "\ne to open $EDITOR, or type your code and end with a line \"%s\" (%s): ", endMarker, answerKeys(d))
+		} else {
+			fmt.Fprintf(r.out, "\nType your code and end with a line \"%s\" (%s): ", endMarker, answerKeys(d))
+		}
+	}
+}
+
+// codeOutcome is what one code drill cost: whether it ended up passing, how
+// many compiles it took and how many hints were burned along the way.
+type codeOutcome struct {
+	correct  bool
+	attempts int
+	hints    int
+}
+
+// codeAttempts is the try ceiling for one code drill.
+func (r *Runner) codeAttempts() int {
+	if r.CodeAttempts > 0 {
+		return r.CodeAttempts
+	}
+	return defaultCodeAttempts
+}
+
+// gradeCode compiles the user's source against the drill's tests, and on a
+// failure offers another try instead of revealing the answer straight away:
+// a missing return or a typo is worth fixing yourself, and reading the failing
+// test output is most of the value. first is the line already consumed by
+// runOne. The working version is shown once the tries run out or the user
+// asks for it.
+func (r *Runner) gradeCode(d drill.Drill, first string) (codeOutcome, error) {
+	var out codeOutcome
+	max := r.codeAttempts()
+	seed := d.Code.Stub
+	line := first
+	for {
+		src, err := r.collectSource(d, line, seed, &out)
+		if err != nil {
+			return out, err
+		}
+		if strings.TrimSpace(src) == "" {
+			fmt.Fprintln(r.out, "\nnothing to compile.")
+			r.revealCode(d)
+			return out, nil
+		}
+		out.attempts++
+
+		fmt.Fprintln(r.out, "\ncompiling and running the tests...")
+		res, err := r.Grade(context.Background(), codecheck.Program{
+			Preamble: d.Code.Preamble,
+			Source:   src,
+			Tests:    d.Code.Tests,
+		})
+		if err != nil {
+			fmt.Fprintf(r.out, "\ncould not grade: %v\n", err)
+			return out, nil
+		}
+		if res.Passed {
+			fmt.Fprintln(r.out, "\nall tests pass.")
+			out.correct = true
+			return out, nil
+		}
+		if res.TimedOut {
+			fmt.Fprintln(r.out, "\ntimed out, so something never terminates.")
+		}
+		fmt.Fprintf(r.out, "\ntests failed:\n%s\n", res.Output)
+		if out.attempts >= max {
+			fmt.Fprintf(r.out, "\nthat was try %d of %d.\n", out.attempts, max)
+			r.revealCode(d)
+			return out, nil
+		}
+		fmt.Fprintf(r.out, "\nr to fix it (%d %s left), anything else to give up: ", max-out.attempts, plural(max-out.attempts, "try", "tries"))
+		again, hints, err := r.readAnswer(d, func() {})
+		out.hints += hints
+		if err != nil || !strings.EqualFold(strings.TrimSpace(again), "r") {
+			r.revealCode(d)
+			return out, nil
+		}
+		// Next try starts from what you just wrote, not the stub.
+		seed, line = src, ""
+	}
+}
+
+// collectSource gathers one attempt's Go source. line is the entry already
+// read (empty on a retry, where the prompt is issued here); seed is what the
+// editor opens on.
+func (r *Runner) collectSource(d drill.Drill, line, seed string, out *codeOutcome) (string, error) {
+	if line == "" {
+		got, hints, err := r.readAnswer(d, r.codePrompt(d))
+		out.hints += hints
+		if err != nil {
+			return "", err
+		}
+		line = got
+	}
+	if strings.EqualFold(strings.TrimSpace(line), "e") && r.Editor != nil {
+		edited, err := r.Editor(seed)
 		if err != nil {
 			fmt.Fprintf(r.out, "\neditor failed: %v\n", err)
-			return false, nil
+			return "", nil
 		}
-		src = edited
-	} else {
-		rest, err := r.readUntilMarker()
-		if err != nil && err != io.EOF {
-			return false, err
-		}
-		src = strings.Join(append([]string{first}, rest...), "\n")
+		return edited, nil
 	}
-	if strings.TrimSpace(src) == "" {
-		fmt.Fprintln(r.out, "\nnothing to compile.")
-		return false, nil
+	rest, err := r.readUntilMarker()
+	if err != nil && err != io.EOF {
+		return "", err
 	}
+	return strings.Join(append([]string{line}, rest...), "\n"), nil
+}
 
-	fmt.Fprintln(r.out, "\ncompiling and running the tests...")
-	res, err := r.Grade(context.Background(), codecheck.Program{
-		Preamble: d.Code.Preamble,
-		Source:   src,
-		Tests:    d.Code.Tests,
-	})
-	if err != nil {
-		fmt.Fprintf(r.out, "\ncould not grade: %v\n", err)
-		return false, nil
+func (r *Runner) revealCode(d drill.Drill) {
+	fmt.Fprintf(r.out, "\nworking version:\n%s\n", d.Answer)
+}
+
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return one
 	}
-	if res.Passed {
-		fmt.Fprintln(r.out, "\nall tests pass.")
-		return true, nil
-	}
-	if res.TimedOut {
-		fmt.Fprintln(r.out, "\ntimed out, so something never terminates.")
-	}
-	fmt.Fprintf(r.out, "\ntests failed:\n%s\n\nworking version:\n%s\n", res.Output, d.Answer)
-	return false, nil
+	return many
 }
 
 // readUntilMarker consumes lines up to the end marker, returning what it read
@@ -399,7 +493,11 @@ func (r *Runner) printSummary(rep Report) {
 		case res.Correct:
 			mark = "+"
 		}
-		fmt.Fprintf(r.out, "  %s %s (%s) %s\n", mark, res.Drill.Title, res.Drill.Topic, res.Elapsed.Round(time.Second))
+		tries := ""
+		if res.Attempts > 1 {
+			tries = fmt.Sprintf(" %d tries", res.Attempts)
+		}
+		fmt.Fprintf(r.out, "  %s %s (%s) %s%s\n", mark, res.Drill.Title, res.Drill.Topic, res.Elapsed.Round(time.Second), tries)
 	}
 	for _, d := range rep.Unasked {
 		fmt.Fprintf(r.out, "  . %s (%s) not reached\n", d.Title, d.Topic)

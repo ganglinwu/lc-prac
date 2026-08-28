@@ -463,3 +463,125 @@ func TestSummaryMarksHintedSolvesApart(t *testing.T) {
 		t.Errorf("hinted solve should get its own mark:\n%s", out)
 	}
 }
+
+// runCodeTries is runCode with a try ceiling, for the retry-a-failed-compile path.
+func runCodeTries(t *testing.T, tries int, input string, grade func(context.Context, codecheck.Program) (codecheck.Result, error), editor func(string) (string, error), ds ...drill.Drill) (Report, string) {
+	t.Helper()
+	var out strings.Builder
+	r := New(strings.NewReader(input), &out)
+	r.RetryMisses = false
+	r.Grade = grade
+	r.Editor = editor
+	r.CodeAttempts = tries
+	tick := 0
+	r.Now = func() time.Time {
+		tick++
+		return time.Unix(int64(tick), 0)
+	}
+	rep, err := r.Run(session.Session{Drills: ds, BudgetMinutes: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return rep, out.String()
+}
+
+// failThenPass fails every compile until the nth, so a test can drive the
+// fix-it loop deterministically.
+func failThenPass(passOn int) (func(context.Context, codecheck.Program) (codecheck.Result, error), *int) {
+	n := 0
+	return func(context.Context, codecheck.Program) (codecheck.Result, error) {
+		n++
+		if n >= passOn {
+			return codecheck.Result{Passed: true}, nil
+		}
+		return codecheck.Result{Output: "add_test.go:9: add(2,3) = 0"}, nil
+	}, &n
+}
+
+func TestCodeDrillRetryLetsYouFixAndPass(t *testing.T) {
+	grade, calls := failThenPass(2)
+	input := "func add(a, b int) int { return 0 }\n.\nr\nfunc add(a, b int) int { return a + b }\n.\n"
+	rep, out := runCodeTries(t, 3, input, grade, nil, codeDrill())
+
+	if *calls != 2 {
+		t.Fatalf("expected two compiles, got %d", *calls)
+	}
+	if correct, _ := rep.Score(); correct != 1 {
+		t.Fatalf("a fix on the second try should score, got %d correct", correct)
+	}
+	if rep.Results[0].Attempts != 2 {
+		t.Errorf("Attempts = %d, want 2", rep.Results[0].Attempts)
+	}
+	if strings.Contains(out, "working version") {
+		t.Error("the answer should not be revealed on a drill you ended up solving")
+	}
+	if !strings.Contains(out, "2 tries") {
+		t.Errorf("summary should show the try count, got:\n%s", out)
+	}
+}
+
+func TestCodeDrillDecliningRetryRevealsAnswerOnce(t *testing.T) {
+	grade, calls := failThenPass(99)
+	rep, out := runCodeTries(t, 3, "func add(a, b int) int { return 0 }\n.\nn\n", grade, nil, codeDrill())
+
+	if *calls != 1 {
+		t.Fatalf("declining should not compile again, got %d compiles", *calls)
+	}
+	if correct, attempted := rep.Score(); correct != 0 || attempted != 1 {
+		t.Fatalf("Score() = %d/%d, want 0/1", correct, attempted)
+	}
+	if n := strings.Count(out, "working version"); n != 1 {
+		t.Errorf("the answer should be revealed exactly once, got %d:\n%s", n, out)
+	}
+}
+
+func TestCodeDrillStopsAtTheTryCeiling(t *testing.T) {
+	grade, calls := failThenPass(99)
+	input := "a\n.\nr\nb\n.\nr\nc\n.\nr\nd\n.\n"
+	rep, out := runCodeTries(t, 2, input, grade, nil, codeDrill())
+
+	if *calls != 2 {
+		t.Fatalf("the ceiling should cap compiles at 2, got %d", *calls)
+	}
+	if rep.Results[0].Attempts != 2 || rep.Results[0].Correct {
+		t.Fatalf("unexpected result %+v", rep.Results[0])
+	}
+	if !strings.Contains(out, "try 2 of 2") || !strings.Contains(out, "working version") {
+		t.Errorf("running out of tries should say so and reveal, got:\n%s", out)
+	}
+}
+
+func TestCodeDrillRetryEditorOpensOnYourLastVersion(t *testing.T) {
+	grade, _ := failThenPass(2)
+	var seeded []string
+	editor := func(initial string) (string, error) {
+		seeded = append(seeded, initial)
+		return "func add(a, b int) int { return a + b }", nil
+	}
+	rep, _ := runCodeTries(t, 3, "func add(a, b int) int { return 0 }\n.\nr\ne\n", grade, editor, codeDrill())
+
+	if len(seeded) != 1 || seeded[0] != "func add(a, b int) int { return 0 }" {
+		t.Fatalf("retry editor should open on the previous attempt, got %q", seeded)
+	}
+	if correct, _ := rep.Score(); correct != 1 {
+		t.Fatal("the edited retry should score")
+	}
+}
+
+func TestCodeDrillHintsWorkDuringRetry(t *testing.T) {
+	d := codeDrill()
+	d.Hints = []string{"use a map", "one pass is enough"}
+	grade, _ := failThenPass(2)
+	input := "func add(a, b int) int { return 0 }\n.\nh\nr\nfunc add(a, b int) int { return a + b }\n.\n"
+	rep, out := runCodeTries(t, 3, input, grade, nil, d)
+
+	if !strings.Contains(out, "hint 1/2: use a map") {
+		t.Errorf("h at the retry prompt should reveal a hint, got:\n%s", out)
+	}
+	if rep.Results[0].Hints != 1 {
+		t.Errorf("Hints = %d, want 1", rep.Results[0].Hints)
+	}
+	if !strings.Contains(out, "~ Add") {
+		t.Errorf("a hinted solve should be marked ~, got:\n%s", out)
+	}
+}
