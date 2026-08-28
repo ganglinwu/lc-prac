@@ -21,6 +21,9 @@ type Options struct {
 	// Seed makes selection reproducible. Callers that want variety pass a
 	// changing value (typically the wall clock).
 	Seed uint64
+	// Priority ranks drills for selection; higher is picked first. Nil means
+	// every drill is equally worth doing, which is the no-history case.
+	Priority func(drill.Drill) int
 }
 
 // DefaultBudget is the session length the CLI aims for when none is given.
@@ -54,6 +57,7 @@ func Build(set *drill.Set, opts Options) (Session, error) {
 
 	rng := rand.New(rand.NewPCG(opts.Seed, opts.Seed^0x9e3779b97f4a7c15))
 	buckets := bucketByTopic(candidates, rng)
+	prioritize(buckets, opts.Priority)
 
 	chosen := make([]drill.Drill, 0, len(candidates))
 	remaining := opts.BudgetMinutes
@@ -77,6 +81,28 @@ func Build(set *drill.Set, opts Options) (Session, error) {
 		return Session{}, fmt.Errorf("budget of %d minutes is too small for any matching drill", opts.BudgetMinutes)
 	}
 	return Session{Drills: chosen, BudgetMinutes: opts.BudgetMinutes}, nil
+}
+
+// prioritize orders each bucket, and the rotation itself, by priority. It
+// sorts stably so the shuffle stays the tiebreak among equally due drills.
+func prioritize(buckets []bucket, priority func(drill.Drill) int) {
+	if priority == nil {
+		return
+	}
+	for i := range buckets {
+		ds := buckets[i].drills
+		sort.SliceStable(ds, func(a, b int) bool { return priority(ds[a]) > priority(ds[b]) })
+	}
+	sort.SliceStable(buckets, func(a, b int) bool {
+		return headPriority(buckets[a], priority) > headPriority(buckets[b], priority)
+	})
+}
+
+func headPriority(b bucket, priority func(drill.Drill) int) int {
+	if len(b.drills) == 0 {
+		return 0
+	}
+	return priority(b.drills[0])
 }
 
 type bucket struct {

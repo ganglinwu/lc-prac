@@ -134,3 +134,65 @@ func TestBuildOnBuiltinDeckHitsTargetLength(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildPrefersHighPriorityDrills(t *testing.T) {
+	set := setOf(t,
+		mk("cold-a", "x", 3), mk("hot-a", "x", 3),
+		mk("cold-b", "y", 3), mk("hot-b", "y", 3),
+	)
+	priority := func(d drill.Drill) int {
+		if d.ID[:3] == "hot" {
+			return 200
+		}
+		return 1
+	}
+	// Every seed must surface the due drills first, not just a lucky one.
+	for seed := uint64(1); seed <= 20; seed++ {
+		s, err := Build(set, Options{BudgetMinutes: 6, Seed: seed, Priority: priority})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, d := range s.Drills {
+			if d.ID[:3] != "hot" {
+				t.Fatalf("seed %d picked %s over a due drill", seed, d.ID)
+			}
+		}
+	}
+}
+
+func TestBuildStillFillsBudgetWhenPriorityRunsOut(t *testing.T) {
+	set := setOf(t, mk("hot", "x", 3), mk("cold-a", "y", 3), mk("cold-b", "z", 3))
+	priority := func(d drill.Drill) int {
+		if d.ID == "hot" {
+			return 200
+		}
+		return 1
+	}
+	s, err := Build(set, Options{BudgetMinutes: 9, Seed: 7, Priority: priority})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(s.Drills) != 3 {
+		t.Fatalf("priority should reorder, not exclude: got %d drills", len(s.Drills))
+	}
+	if s.Drills[0].ID != "hot" {
+		t.Fatalf("highest priority drill should come first, got %s", s.Drills[0].ID)
+	}
+}
+
+func TestBuildIgnoresNilPriority(t *testing.T) {
+	set := setOf(t, mk("a", "x", 3), mk("b", "y", 3))
+	withNil, err := Build(set, Options{BudgetMinutes: 6, Seed: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	flat, err := Build(set, Options{BudgetMinutes: 6, Seed: 3, Priority: func(drill.Drill) int { return 5 }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range withNil.Drills {
+		if withNil.Drills[i].ID != flat.Drills[i].ID {
+			t.Fatalf("a flat priority changed the order: %v vs %v", withNil.Drills, flat.Drills)
+		}
+	}
+}

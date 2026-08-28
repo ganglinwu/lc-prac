@@ -17,12 +17,36 @@ go run ./cmd/lcprac drill -topic dp      # only dynamic programming
 go run ./cmd/lcprac drill -seed 42       # reproducible selection
 go run ./cmd/lcprac list                 # every drill, no session
 go run ./cmd/lcprac topics               # topics and their drill counts
+go run ./cmd/lcprac stats                # accuracy so far and what is due
 ```
 
 Install it as a real binary with `go install ./cmd/lcprac`.
 
 During a session, answer the prompt and press enter, or type `s` to skip.
 Ctrl-D quits early and still prints the summary.
+
+## Spaced repetition
+
+Every graded drill is recorded, and the result decides when it comes back:
+
+| streak of correct answers | comes back in |
+| --- | --- |
+| 0 (you missed it) | 10 minutes |
+| 1 | 1 day |
+| 2 | 3 days |
+| 3 | 1 week |
+| 4 | 3 weeks |
+| 5+ | 2 months |
+
+Sessions then pick overdue drills first, never-seen drills next, and resting
+drills only to fill the budget. Skipped drills are not recorded, so skipping is
+free. `lcprac stats` shows per-topic accuracy and how much is due; add `-reset`
+to wipe history.
+
+History lives in `$LCPRAC_HOME/progress.json` if that is set, otherwise
+`$XDG_DATA_HOME/lcprac/` or `~/.local/share/lcprac/`. Two flags opt out:
+`-shuffle` picks at random and ignores your history, `-nosave` runs a session
+without recording it.
 
 ## Drill kinds
 
@@ -50,4 +74,5 @@ cmd/lcprac        flag parsing and subcommands
 internal/drill    the Drill type, validation, and the embedded deck
 internal/session  picking drills that fit a time budget
 internal/runner   the interactive prompt/answer/grade loop
+internal/progress recorded history and the spaced-repetition schedule
 ```
