@@ -147,3 +147,107 @@ func TestMissedOutcomeMatchesRecordFalse(t *testing.T) {
 		t.Fatal("Record(false) and RecordOutcome(Missed) should agree")
 	}
 }
+
+func TestSessionsRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "progress.json")
+	s := New(path)
+	base := time.Date(2026, 8, 20, 9, 0, 0, 0, time.UTC)
+	s.Record("a", true, base)
+	s.AddSession(Session{At: base, Minutes: 12, Attempted: 5, Correct: 4, Assisted: 1, Skipped: 2})
+	if err := s.Save(); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessions := got.Sessions()
+	if len(sessions) != 1 {
+		t.Fatalf("sessions = %d, want 1", len(sessions))
+	}
+	if sessions[0].Attempted != 5 || sessions[0].Correct != 4 || sessions[0].Minutes != 12 {
+		t.Errorf("session round-tripped as %+v", sessions[0])
+	}
+	if !sessions[0].At.Equal(base) {
+		t.Errorf("At = %v, want %v", sessions[0].At, base)
+	}
+}
+
+func TestSessionLogIsBounded(t *testing.T) {
+	s := New("")
+	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	for i := 0; i < maxSessions+10; i++ {
+		s.AddSession(Session{At: base.Add(time.Duration(i) * time.Hour), Attempted: i})
+	}
+	got := s.Sessions()
+	if len(got) != maxSessions {
+		t.Fatalf("len = %d, want %d", len(got), maxSessions)
+	}
+	if got[0].Attempted != 10 {
+		t.Errorf("oldest kept is %d, want the 10th (earliest dropped)", got[0].Attempted)
+	}
+}
+
+func TestRecentSessionsAreNewestFirst(t *testing.T) {
+	s := New("")
+	base := time.Date(2026, 3, 1, 8, 0, 0, 0, time.UTC)
+	for i := 0; i < 8; i++ {
+		s.AddSession(Session{At: base.AddDate(0, 0, i), Attempted: i})
+	}
+	got := s.RecentSessions(3)
+	if len(got) != 3 {
+		t.Fatalf("len = %d, want 3", len(got))
+	}
+	if got[0].Attempted != 7 || got[2].Attempted != 5 {
+		t.Errorf("recent = %d,%d,%d, want 7,6,5", got[0].Attempted, got[1].Attempted, got[2].Attempted)
+	}
+}
+
+func TestDayStreak(t *testing.T) {
+	now := time.Date(2026, 8, 29, 21, 0, 0, 0, time.UTC)
+	day := func(n int) time.Time { return now.AddDate(0, 0, -n) }
+	tests := []struct {
+		name string
+		at   []time.Time
+		want int
+	}{
+		{"empty", nil, 0},
+		{"today only", []time.Time{day(0)}, 1},
+		{"today and yesterday", []time.Time{day(1), day(0)}, 2},
+		{"yesterday still counts", []time.Time{day(2), day(1)}, 2},
+		{"two days idle breaks it", []time.Time{day(3), day(2)}, 0},
+		{"twice in a day counts once", []time.Time{day(0), day(0).Add(-3 * time.Hour), day(1)}, 2},
+		{"gap stops the walk", []time.Time{day(5), day(4), day(1), day(0)}, 2},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s := New("")
+			for _, at := range tc.at {
+				s.AddSession(Session{At: at, Attempted: 1})
+			}
+			if got := s.DayStreak(now); got != tc.want {
+				t.Errorf("DayStreak = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestLoadWithoutSessionsIsEmpty(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "progress.json")
+	old := `{"version":1,"records":[{"drill_id":"a","seen":1,"correct":1,"streak":1}]}`
+	if err := os.WriteFile(path, []byte(old), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(s.Sessions()) != 0 {
+		t.Errorf("sessions = %d, want 0 for a pre-session history file", len(s.Sessions()))
+	}
+	if s.Len() != 1 {
+		t.Errorf("records = %d, want 1", s.Len())
+	}
+}

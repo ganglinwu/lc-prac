@@ -55,13 +55,15 @@ func interval(streak int) time.Duration {
 
 // Store holds every record and knows where to write them back.
 type Store struct {
-	path    string
-	records map[string]Record
+	path     string
+	records  map[string]Record
+	sessions []Session
 }
 
 type file struct {
-	Version int      `json:"version"`
-	Records []Record `json:"records"`
+	Version  int       `json:"version"`
+	Records  []Record  `json:"records"`
+	Sessions []Session `json:"sessions,omitempty"`
 }
 
 // New returns an empty in-memory store bound to path. An empty path makes
@@ -89,6 +91,7 @@ func Load(path string) (*Store, error) {
 			s.records[r.DrillID] = r
 		}
 	}
+	s.sessions = f.Sessions
 	return s, nil
 }
 
@@ -100,7 +103,7 @@ func (s *Store) Save() error {
 	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
 		return err
 	}
-	f := file{Version: 1, Records: s.Records()}
+	f := file{Version: 1, Records: s.Records(), Sessions: s.sessions}
 	b, err := json.MarshalIndent(f, "", "  ")
 	if err != nil {
 		return err
@@ -219,3 +222,67 @@ func DefaultPath() (string, error) {
 	}
 	return filepath.Join(home, ".local", "share", "lcprac", "progress.json"), nil
 }
+
+// Session is one sitting, logged so the habit itself is visible: what the
+// per-drill records cannot show is whether you practised at all this week.
+type Session struct {
+	At        time.Time `json:"at"`
+	Minutes   int       `json:"minutes"`
+	Attempted int       `json:"attempted"`
+	Correct   int       `json:"correct"`
+	Assisted  int       `json:"assisted,omitempty"`
+	Skipped   int       `json:"skipped,omitempty"`
+}
+
+// maxSessions bounds the log so a daily habit cannot grow the file forever.
+const maxSessions = 200
+
+// AddSession appends one sitting, dropping the oldest once the log is full.
+func (s *Store) AddSession(sess Session) {
+	s.sessions = append(s.sessions, sess)
+	if len(s.sessions) > maxSessions {
+		s.sessions = s.sessions[len(s.sessions)-maxSessions:]
+	}
+}
+
+// Sessions returns the logged sittings, oldest first.
+func (s *Store) Sessions() []Session {
+	out := make([]Session, len(s.sessions))
+	copy(out, s.sessions)
+	return out
+}
+
+// RecentSessions returns up to n sittings, newest first.
+func (s *Store) RecentSessions(n int) []Session {
+	out := s.Sessions()
+	sort.Slice(out, func(i, j int) bool { return out[i].At.After(out[j].At) })
+	if len(out) > n {
+		out = out[:n]
+	}
+	return out
+}
+
+// DayStreak counts consecutive days ending today that have a session. A day
+// with no practice yet does not break the streak, so it survives until
+// tomorrow: the count is taken from yesterday when today is still empty.
+func (s *Store) DayStreak(now time.Time) int {
+	days := map[string]bool{}
+	for _, sess := range s.sessions {
+		days[dayKey(sess.At.In(now.Location()))] = true
+	}
+	d := now
+	if !days[dayKey(d)] {
+		d = d.AddDate(0, 0, -1)
+		if !days[dayKey(d)] {
+			return 0
+		}
+	}
+	n := 0
+	for days[dayKey(d)] {
+		n++
+		d = d.AddDate(0, 0, -1)
+	}
+	return n
+}
+
+func dayKey(t time.Time) string { return t.Format("2006-01-02") }

@@ -22,7 +22,7 @@ go run ./cmd/lcprac drill -topic dp      # only dynamic programming
 go run ./cmd/lcprac drill -seed 42       # reproducible selection
 go run ./cmd/lcprac list                 # every drill, no session
 go run ./cmd/lcprac topics               # topics and their drill counts
-go run ./cmd/lcprac stats                # accuracy so far and what is due
+go run ./cmd/lcprac stats                # accuracy, streak, recent sessions, what is due
 go run ./cmd/lcprac mine                 # your own drills and where they live
 ```
 
@@ -70,6 +70,28 @@ Sessions then pick overdue drills first, never-seen drills next, and resting
 drills only to fill the budget. Skipped drills are not recorded, so skipping is
 free. `lcprac stats` shows per-topic accuracy and how much is due; add `-reset`
 to wipe history.
+
+## Streak and what to practise next
+
+Each sitting is also logged (when, how long, how many drills, how you did), so
+the history shows the habit and not just the drills. After a session that
+recorded anything, `lcprac` prints your streak; `lcprac stats` shows the last
+five sessions, the streak, and a `next up` suggestion:
+
+```
+recent sessions
+  Thu 28 Aug 21:14  12m   9 drills   77%
+  Wed 27 Aug 08:02  11m   8 drills   62%
+streak: 2 day(s) in a row
+```
+
+A streak counts consecutive days with at least one session. Today counts as
+soon as you practise, and a day you have not practised yet does not break it
+until it ends, so the count is taken from yesterday while today is still empty.
+`next up` names the topic with your worst accuracy once it has at least three
+attempts on record, and before that the topic with the most drills you have
+never tried. The log keeps the most recent 200 sessions and `stats -reset`
+clears it along with the drill history.
 
 History lives in `$LCPRAC_HOME/progress.json` if that is set, otherwise
 `$XDG_DATA_HOME/lcprac/` or `~/.local/share/lcprac/`. Two flags opt out:

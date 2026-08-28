@@ -60,7 +60,8 @@ func usage() {
   lcprac topics
       Show topics and how many drills each has.
   lcprac stats [-reset]
-      Show what you have practised and what is due to come back.
+      Show what you have practised, your streak and recent sessions, and
+      what is due to come back.
   lcprac mine [-init]
       Show where your own drill files live and what they add. -init writes a
       commented example you can copy.
@@ -192,9 +193,6 @@ func saveResults(store *progress.Store, rep runner.Report) error {
 	if recorded == 0 {
 		return nil
 	}
-	if err := store.Save(); err != nil {
-		return err
-	}
 	soon := 0
 	for _, res := range rep.Results {
 		if !res.Skipped && !res.Correct {
@@ -207,7 +205,22 @@ func saveResults(store *progress.Store, rep runner.Report) error {
 			hinted++
 		}
 	}
+	correct, _ := rep.Score()
+	store.AddSession(progress.Session{
+		At:        now,
+		Minutes:   wholeMinutes(rep.Elapsed),
+		Attempted: recorded,
+		Correct:   correct,
+		Assisted:  hinted,
+		Skipped:   len(rep.Results) - recorded,
+	})
+	if err := store.Save(); err != nil {
+		return err
+	}
 	fmt.Printf("\nsaved %d results to %s\n", recorded, store.Path())
+	if n := store.DayStreak(now); n > 1 {
+		fmt.Printf("practice streak: %d days.\n", n)
+	}
 	if hinted > 0 {
 		fmt.Printf("%d solved with a hint, so they hold their place instead of climbing the ladder.\n", hinted)
 	}
@@ -297,32 +310,55 @@ func cmdStats(args []string) error {
 
 	now := time.Now()
 	var seen, correct, assisted, due int
+	var stats []topicStat
 	for _, t := range set.Topics() {
-		var tSeen, tCorrect, tAssisted, tDue, tTouched int
+		row := topicStat{Topic: t, Total: len(set.Filter(t, "", ""))}
+		tAssisted := 0
 		for _, d := range set.Filter(t, "", "") {
 			r, ok := store.Get(d.ID)
 			if ok {
-				tTouched++
-				tSeen += r.Seen
-				tCorrect += r.Correct
+				row.Tried++
+				row.Seen += r.Seen
+				row.Correct += r.Correct
 				tAssisted += r.Assisted
 			}
 			if store.Due(d.ID, now) {
-				tDue++
+				row.Due++
 			}
 		}
-		seen += tSeen
-		correct += tCorrect
+		stats = append(stats, row)
+		seen += row.Seen
+		correct += row.Correct
 		assisted += tAssisted
-		due += tDue
-		fmt.Printf("%-16s %2d/%2d drills tried  %s  %2d due\n", t, tTouched, len(set.Filter(t, "", "")), pct(tCorrect, tSeen), tDue)
+		due += row.Due
+		fmt.Printf("%-16s %2d/%2d drills tried  %s  %2d due\n", t, row.Tried, row.Total, pct(row.Correct, row.Seen), row.Due)
 	}
 	fmt.Printf("\ntotal: %s over %d attempts, %d of %d drills due now\n", pct(correct, seen), seen, due, set.Len())
 	if assisted > 0 {
 		fmt.Printf("%d of those correct answers needed a hint.\n", assisted)
 	}
+	if next := focus(stats); next != "" {
+		fmt.Printf("next up: lcprac drill -topic %s\n", next)
+	}
+	printSessions(store, now)
 	fmt.Printf("history: %s\n", path)
 	return nil
+}
+
+// printSessions shows the recent sittings and the streak, which is the part of
+// the history that says whether the habit is holding.
+func printSessions(store *progress.Store, now time.Time) {
+	recent := store.RecentSessions(5)
+	if len(recent) == 0 {
+		return
+	}
+	fmt.Printf("\nrecent sessions\n")
+	for _, s := range recent {
+		fmt.Printf("  %s  %2dm  %2d drills  %s\n", s.At.Local().Format("Mon 02 Jan 15:04"), s.Minutes, s.Attempted, pct(s.Correct, s.Attempted))
+	}
+	if n := store.DayStreak(now); n > 0 {
+		fmt.Printf("streak: %d day(s) in a row\n", n)
+	}
 }
 
 // mark flags a drill you wrote yourself, so your deck is visible in a listing.
@@ -331,6 +367,48 @@ func mark(d drill.Drill) string {
 		return "*"
 	}
 	return " "
+}
+
+// wholeMinutes rounds a sitting to at least one minute, so a fast session is
+// still logged as time spent rather than as zero.
+func wholeMinutes(d time.Duration) int {
+	m := int((d + 30*time.Second) / time.Minute)
+	if m < 1 {
+		m = 1
+	}
+	return m
+}
+
+// topicStat is one row of the stats table, kept as data so the focus pick can
+// be tested without printing.
+type topicStat struct {
+	Topic                            string
+	Tried, Total, Seen, Correct, Due int
+}
+
+// focus suggests what to practise next: the weakest topic you have real data
+// on, else the one with the most drills you have never tried.
+func focus(stats []topicStat) string {
+	best, bestAcc := "", 101
+	for _, t := range stats {
+		if t.Seen < 3 {
+			continue
+		}
+		acc := t.Correct * 100 / t.Seen
+		if acc < bestAcc {
+			best, bestAcc = t.Topic, acc
+		}
+	}
+	if best != "" {
+		return best
+	}
+	most := 0
+	for _, t := range stats {
+		if untried := t.Total - t.Tried; untried > most {
+			best, most = t.Topic, untried
+		}
+	}
+	return best
 }
 
 // pct renders accuracy, or a placeholder when a topic is untouched.
