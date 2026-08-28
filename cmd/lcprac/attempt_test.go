@@ -102,7 +102,7 @@ func TestProblemRowsForgetStaleSolve(t *testing.T) {
 
 func TestWriteLoggedPointsAtDrillsAfterAMiss(t *testing.T) {
 	var buf bytes.Buffer
-	writeLogged(&buf, "LC 56 Merge Intervals", progress.Failed, "off-by-one on the merge")
+	writeLogged(&buf, "LC 56 Merge Intervals", progress.Failed, "off-by-one on the merge", true)
 	out := buf.String()
 	for _, want := range []string{"logged LC 56", "failed", "off-by-one", "drill -problem 56"} {
 		if !strings.Contains(out, want) {
@@ -110,7 +110,7 @@ func TestWriteLoggedPointsAtDrillsAfterAMiss(t *testing.T) {
 		}
 	}
 	buf.Reset()
-	writeLogged(&buf, "LC 56 Merge Intervals", progress.Passed, "")
+	writeLogged(&buf, "LC 56 Merge Intervals", progress.Passed, "", true)
 	if strings.Contains(buf.String(), "-problem") {
 		t.Errorf("a solve should not nag you back to the drills:\n%s", buf.String())
 	}
@@ -137,5 +137,60 @@ func TestWriteAttemptsListsNewestFirstWithTally(t *testing.T) {
 	}
 	if !strings.Contains(out, "2 attempt(s): 1 solved, 1 not yet.") {
 		t.Errorf("tally should span every attempt:\n%s", out)
+	}
+}
+
+func TestPullFlagLiftsFromAnywhere(t *testing.T) {
+	rest, found := pullFlag([]string{"128", "-new", "hard"}, "-new", "--new")
+	if !found || strings.Join(rest, " ") != "128 hard" {
+		t.Errorf("rest = %v found = %v", rest, found)
+	}
+	if _, found := pullFlag([]string{"128"}, "-new", "--new"); found {
+		t.Error("want found = false when the flag is absent")
+	}
+}
+
+func TestNormalizeRefShapesHandTypedProblems(t *testing.T) {
+	cases := map[string]string{
+		"128 Longest Consecutive Sequence": "LC 128 Longest Consecutive Sequence",
+		"lc128 Longest Consecutive":        "LC 128 Longest Consecutive",
+		"LC  128   Longest  Consecutive":   "LC 128 Longest Consecutive",
+		"Longest Consecutive Sequence":     "Longest Consecutive Sequence",
+		"  ":                               "",
+	}
+	for in, want := range cases {
+		if got := normalizeRef(in); got != want {
+			t.Errorf("normalizeRef(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestNewProblemRefReusesADeckRefAndFlagsCoverage(t *testing.T) {
+	set, _ := problemFixture(t)
+	ref, covered, err := newProblemRef(set, "lc 20 valid parentheses")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ref != "LC 20 Valid Parentheses" || !covered {
+		t.Errorf("ref = %q covered = %v, want the deck's own spelling", ref, covered)
+	}
+	ref, covered, err = newProblemRef(set, "128 Longest Consecutive Sequence")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ref != "LC 128 Longest Consecutive Sequence" || covered {
+		t.Errorf("ref = %q covered = %v, want an uncovered new problem", ref, covered)
+	}
+	if _, _, err := newProblemRef(set, "   "); err == nil {
+		t.Error("want an error when no problem is named")
+	}
+}
+
+func TestWriteLoggedPointsAtAddWhenUncovered(t *testing.T) {
+	var buf bytes.Buffer
+	writeLogged(&buf, "LC 128 Longest Consecutive Sequence", progress.Failed, "", false)
+	out := buf.String()
+	if !strings.Contains(out, "lcprac add") || strings.Contains(out, "-problem") {
+		t.Errorf("an uncovered problem should point at add, not a drill session:\n%s", out)
 	}
 }

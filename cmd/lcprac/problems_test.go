@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 	"time"
@@ -137,6 +138,45 @@ func TestBuiltinDeckNamesProblems(t *testing.T) {
 	for _, r := range rows {
 		if len(r.Topics) == 0 {
 			t.Errorf("%s has no topic", r.Ref)
+		}
+	}
+}
+
+func TestProblemRowsIncludeUncoveredAttempts(t *testing.T) {
+	set, store := problemFixture(t)
+	now := time.Now()
+	store.LogAttempt("LC 128 Longest Consecutive Sequence", progress.Passed, "", now)
+	rows := problemRows(set, store, "", now)
+	if len(rows) != 4 {
+		t.Fatalf("got %d rows, want 4 (three from the deck plus the attempt-only one)", len(rows))
+	}
+	var gap problemRow
+	for _, r := range rows {
+		if strings.HasPrefix(r.Ref, "LC 128") {
+			gap = r
+		}
+	}
+	// A fresh solve would normally sink to tier 3, but with no drill behind
+	// it the row is a coverage gap, not a settled problem.
+	if gap.Drills != 0 || gap.tier() != 1 {
+		t.Errorf("gap row = %+v, want 0 drills at tier 1", gap)
+	}
+	if mark := problemMark(gap); !strings.Contains(mark, "no drill covers it") {
+		t.Errorf("mark = %q", mark)
+	}
+	if rows := problemRows(set, store, "dp", now); len(rows) != 1 {
+		t.Errorf("a topic filter is about the deck, so it should skip attempt-only rows; got %d rows", len(rows))
+	}
+}
+
+func TestWriteProblemsReportsGapsAndPointsAtAdd(t *testing.T) {
+	var buf bytes.Buffer
+	rows := []problemRow{{Ref: "LC 128 Longest Consecutive Sequence"}, {Ref: "LC 20 Valid Parentheses", Drills: 1, Topics: []string{"stack"}}}
+	writeProblems(&buf, rows, 0)
+	out := buf.String()
+	for _, want := range []string{"no drill covers it", "1 of them has no drill behind it yet", "next up: `lcprac add` a drill for LC 128"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
 		}
 	}
 }

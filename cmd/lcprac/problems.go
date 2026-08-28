@@ -71,13 +71,16 @@ func (p problemRow) Accuracy() int {
 // tier orders the list the way you would work through it: the patterns you
 // get wrong, then the ones you have never touched, then the settled ones.
 func (p problemRow) tier() int {
-	if p.Attempt != nil {
-		switch {
-		case p.Attempt.Result != progress.Passed:
-			return 0
-		case p.Fresh:
-			return 3
-		}
+	if p.Attempt != nil && p.Attempt.Result != progress.Passed {
+		return 0
+	}
+	// A problem no drill covers stays a gap even after a clean solve: there
+	// is nothing in the deck to keep it fresh.
+	if p.Drills == 0 {
+		return 1
+	}
+	if p.Attempt != nil && p.Fresh {
+		return 3
 	}
 	switch {
 	case p.Seen > 0 && p.Accuracy() < 100:
@@ -112,6 +115,17 @@ func problemRows(set *drill.Set, store *progress.Store, topic string, now time.T
 				row.Tried++
 				row.Seen += r.Seen
 				row.Correct += r.Correct
+			}
+		}
+	}
+	// Problems you logged with `attempt -new` have no drill behind them at
+	// all; they belong in the list as coverage gaps rather than being
+	// invisible. A topic filter is about the deck, so it excludes them.
+	if topic == "" {
+		for _, a := range store.Attempts() {
+			if byRef[a.Ref] == nil {
+				byRef[a.Ref] = &problemRow{Ref: a.Ref}
+				topics[a.Ref] = map[string]int{}
 			}
 		}
 	}
@@ -179,9 +193,15 @@ func writeProblems(w io.Writer, rows []problemRow, n int) {
 	if logged := attemptedCount(rows); logged > 0 {
 		fmt.Fprintf(w, "%d of them you have attempted for real (`lcprac attempt` to log another).\n", logged)
 	}
+	if gaps := uncoveredCount(rows); gaps > 0 {
+		verb := "have"
+		if gaps == 1 {
+			verb = "has"
+		}
+		fmt.Fprintf(w, "%d of them %s no drill behind it yet (`lcprac add` to write one).\n", gaps, verb)
+	}
 	if len(shown) > 0 {
-		top := shown[0]
-		fmt.Fprintf(w, "next up: attempt %s for real, or `lcprac drill %s` to warm up first.\n", top.Ref, warmUpFlag(top))
+		fmt.Fprint(w, nextUp(shown[0]))
 	}
 }
 
@@ -189,7 +209,10 @@ func writeProblems(w io.Writer, rows []problemRow, n int) {
 // percentage cannot distinguish never-tried from never-right.
 func problemMark(p problemRow) string {
 	mark := fmt.Sprintf("%d%% over %d attempt(s)", p.Accuracy(), p.Seen)
-	if p.Seen == 0 {
+	switch {
+	case p.Drills == 0:
+		mark = "no drill covers it"
+	case p.Seen == 0:
 		mark = "not drilled yet"
 	}
 	if p.Attempt != nil {
@@ -201,6 +224,27 @@ func problemMark(p problemRow) string {
 // staleAfter is how long a solved problem stays settled before it is worth
 // attempting again, matching the top of the drill scheduler's ladder.
 const staleAfter = 60 * 24 * time.Hour
+
+// nextUp is the one line telling you what to do with the top row: warm up on
+// its drills, or write one when the problem has none.
+func nextUp(top problemRow) string {
+	if top.Drills == 0 {
+		return fmt.Sprintf("next up: `lcprac add` a drill for %s, nothing in the deck covers it.\n", top.Ref)
+	}
+	return fmt.Sprintf("next up: attempt %s for real, or `lcprac drill %s` to warm up first.\n", top.Ref, warmUpFlag(top))
+}
+
+// uncoveredCount is how many problems you have attempted for real that no
+// drill in the deck touches.
+func uncoveredCount(rows []problemRow) int {
+	n := 0
+	for _, p := range rows {
+		if p.Drills == 0 {
+			n++
+		}
+	}
+	return n
+}
 
 // warmUpFlag is the drill invocation that warms you up for a problem: by
 // number when the ref carries one, otherwise by its main topic.

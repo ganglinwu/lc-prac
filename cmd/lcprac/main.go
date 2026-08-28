@@ -79,11 +79,13 @@ func usage() {
   lcprac stats [-reset]
       Show what you have practised, your streak and recent sessions, and
       what is due to come back.
-  lcprac attempt [problem] [-solved|-partial|-failed] [your words]
+  lcprac attempt [problem] [-solved|-partial|-failed] [-new] [your words]
       Log a go at a real problem, by number or part of its title. With no
       arguments it lists what you have attempted. No outcome flag means
       solved. A problem you failed or half-solved is pushed to the top of
-      lcprac problems; one you solved recently drops to the bottom.
+      lcprac problems; one you solved recently drops to the bottom. Use
+      -new with a quoted name to log a problem no drill covers yet; it
+      shows up in lcprac problems as a gap to write a drill for.
   lcprac review [-n 5] [-topic X] [-all] [-code] [id...]
       Reread the drills you keep missing, answers shown. Name ids to read
       those instead; -all widens it to everything you have ever missed, and

@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 // way round from `problems`: the drills say what you should attempt, this says
 // what actually happened when you did.
 func cmdAttempt(args []string) error {
+	args, isNew := pullFlag(args, "-new", "--new")
 	res, rest, err := attemptResult(args)
 	if err != nil {
 		return err
@@ -30,16 +32,92 @@ func cmdAttempt(args []string) error {
 		return err
 	}
 	ref, err := resolveProblem(set, rest[0])
+	covered := err == nil
 	if err != nil {
-		return err
+		if !isNew {
+			return err
+		}
+		ref, covered, err = newProblemRef(set, rest[0])
+		if err != nil {
+			return err
+		}
 	}
 	note := strings.Join(rest[1:], " ")
 	store.LogAttempt(ref, res, note, time.Now())
 	if err := store.Save(); err != nil {
 		return err
 	}
-	writeLogged(os.Stdout, ref, res, note)
+	writeLogged(os.Stdout, ref, res, note, covered)
 	return nil
+}
+
+// pullFlag lifts a boolean flag out from anywhere in the argument list. Three
+// commands now hand-parse argv because flag.Parse stops at the first
+// positional, so the scan lives here rather than being written a fourth time.
+func pullFlag(args []string, names ...string) ([]string, bool) {
+	found := false
+	var rest []string
+	for _, a := range args {
+		hit := false
+		for _, n := range names {
+			if a == n {
+				hit = true
+				break
+			}
+		}
+		if hit {
+			found = true
+			continue
+		}
+		rest = append(rest, a)
+	}
+	return rest, found
+}
+
+// newProblemRef names a problem the deck does not cover, so the log can hold
+// the questions you actually get asked and not only the ones drills were cut
+// from. An ambiguous query is still an error: -new should not invent a second
+// spelling of a problem the deck already knows.
+func newProblemRef(set *drill.Set, query string) (string, bool, error) {
+	ref := normalizeRef(query)
+	if ref == "" {
+		return "", false, fmt.Errorf("name the problem, e.g. `lcprac attempt -new \"LC 128 Longest Consecutive Sequence\"`")
+	}
+	for _, d := range set.All() {
+		for _, r := range d.Refs {
+			if strings.EqualFold(strings.TrimSpace(r), ref) {
+				return strings.TrimSpace(r), true, nil
+			}
+		}
+	}
+	return ref, false, nil
+}
+
+// normalizeRef puts a hand-typed problem into the deck's "LC <n> <Title>"
+// shape, so problemNumber can read its number and a later ref for the same
+// problem lands on the same row.
+func normalizeRef(query string) string {
+	q := strings.Join(strings.Fields(query), " ")
+	if q == "" {
+		return ""
+	}
+	fields := strings.Fields(q)
+	head := fields[0]
+	if len(head) > 2 && strings.EqualFold(head[:2], "lc") {
+		if _, err := strconv.Atoi(head[2:]); err == nil {
+			fields = append([]string{"lc", head[2:]}, fields[1:]...)
+			head = "lc"
+		}
+	}
+	if strings.EqualFold(head, "lc") && len(fields) > 1 {
+		if _, err := strconv.Atoi(fields[1]); err == nil {
+			return strings.TrimSpace("LC " + strings.Join(fields[1:], " "))
+		}
+	}
+	if _, err := strconv.Atoi(head); err == nil {
+		return "LC " + q
+	}
+	return q
 }
 
 // attemptResult pulls the outcome flag out from anywhere in the argument list,
@@ -92,7 +170,7 @@ func resolveProblem(set *drill.Set, query string) (string, error) {
 	sort.Strings(refs)
 	switch len(refs) {
 	case 0:
-		return "", fmt.Errorf("no drill names a problem matching %q; try `lcprac problems -all` to see them", query)
+		return "", fmt.Errorf("no drill names a problem matching %q; try `lcprac problems -all` to see them, or -new to log a problem the deck does not cover", query)
 	case 1:
 		return refs[0], nil
 	default:
@@ -102,10 +180,14 @@ func resolveProblem(set *drill.Set, query string) (string, error) {
 
 // writeLogged confirms what went down and, when it did not go well, points at
 // the drills behind that problem.
-func writeLogged(w io.Writer, ref string, res progress.Result, note string) {
+func writeLogged(w io.Writer, ref string, res progress.Result, note string, covered bool) {
 	fmt.Fprintf(w, "logged %s as %s.\n", ref, res)
 	if note != "" {
 		fmt.Fprintf(w, "  note: %s\n", note)
+	}
+	if !covered {
+		fmt.Fprintln(w, "no drill in the deck covers it; `lcprac add` one while it is still fresh.")
+		return
 	}
 	if res == progress.Passed {
 		fmt.Fprintln(w, "(use -partial or -failed if that is not how it went.)")

@@ -232,6 +232,7 @@ lcprac attempt 56 -failed sorted too late, merged into the wrong interval
 lcprac attempt "two sum"          # no outcome flag means solved
 lcprac attempt 20 -partial got it after peeking at the stack invariant
 lcprac attempt                    # everything you have attempted, newest first
+lcprac attempt -new "128 Longest Consecutive Sequence" -failed   # no drill covers it
 ```
 
 The problem is matched the same way `-problem` matches it, by number or by
@@ -244,6 +245,14 @@ half-solved jumps to the top of the list even when its drills look fine, and
 one you solved for real drops to the bottom for 60 days before it is worth
 redoing. A missed attempt prints the `lcprac drill -problem` line for the
 pattern behind it, so the next sitting is already chosen.
+
+Interviews do not stay inside the deck, so `-new` logs a problem no drill
+covers. The name is put into the deck's `LC <number> <Title>` shape (so a bare
+`128 ...` becomes `LC 128 ...`), and a name the deck already uses is reused
+rather than duplicated. Those problems appear in `lcprac problems` marked
+"no drill covers it" and ranked as gaps even after you solve them, with the
+summary counting them and pointing at `lcprac add` to write the drill while
+the problem is still fresh.
 
 ## Drill kinds
 
