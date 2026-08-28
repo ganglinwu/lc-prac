@@ -23,6 +23,7 @@ go run ./cmd/lcprac drill -seed 42       # reproducible selection
 go run ./cmd/lcprac list                 # every drill, no session
 go run ./cmd/lcprac topics               # topics and their drill counts
 go run ./cmd/lcprac stats                # accuracy so far and what is due
+go run ./cmd/lcprac mine                 # your own drills and where they live
 ```
 
 Install it as a real binary with `go install ./cmd/lcprac`.
@@ -131,7 +132,27 @@ grading is offline and cannot pull anything. Your source lands in its own file,
 so an `import` block of your own is fine. If no `go` binary is on `PATH`, code
 drills quietly fall back to self-grading rather than failing.
 
-## Adding drills
+## Your own drills
+
+You do not need to rebuild to add a drill. Any `*.json` file in your drills
+directory is loaded on top of the builtin deck:
+
+```
+lcprac mine          # show the directory and what it currently adds
+lcprac mine -init    # write an example.json there to copy
+```
+
+The directory is `$LCPRAC_HOME/drills`, else `$XDG_DATA_HOME/lcprac/drills`,
+else `~/.local/share/lcprac/drills`. The file format is the same array of
+drills as the builtin deck, and your drills take part in selection, scheduling
+and stats like any other. `list` marks them with `*`.
+
+A drill that reuses a builtin id replaces it in place, which is how you rewrite
+one you disagree with. A malformed file stops the CLI with the filename and the
+problem, rather than being skipped silently; `-builtin` on `drill` or `list`
+ignores your directory entirely if you need to practise anyway.
+
+## Adding drills to the deck
 
 Drills live in `internal/drill/data/*.json` and are compiled into the binary
 with `go:embed`, so there is nothing to install or configure. Add an object to

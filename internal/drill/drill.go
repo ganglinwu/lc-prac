@@ -64,6 +64,9 @@ type Drill struct {
 	Hints []string  `json:"hints,omitempty"`
 	Refs  []string  `json:"refs,omitempty"`
 	Code  *CodeSpec `json:"code,omitempty"`
+	// Source is where the drill was loaded from, filled in by the loader
+	// rather than by the file itself.
+	Source string `json:"-"`
 }
 
 // SelfGraded reports whether the user grades their own answer. Free-form kinds

@@ -37,6 +37,8 @@ func run(args []string) error {
 		return cmdTopics(args)
 	case "stats":
 		return cmdStats(args)
+	case "mine":
+		return cmdMine(args)
 	case "help", "-h", "--help":
 		usage()
 		return nil
@@ -49,16 +51,23 @@ func run(args []string) error {
 func usage() {
 	fmt.Fprint(os.Stderr, `lcprac - short LeetCode pattern drills
 
-  lcprac drill [-m 12] [-topic X] [-kind K] [-diff D] [-seed N] [-noretry] [-nolimit]
+  lcprac drill [-m 12] [-topic X] [-kind K] [-diff D] [-seed N] [-noretry] [-nolimit] [-builtin]
       Run a timed session that fits the minute budget (default 12). The clock
       is real: once the budget is spent no new drill starts. -nolimit disables
       that and lets the session run long.
-  lcprac list [-topic X] [-kind K] [-diff D]
-      List matching drills without running them.
+  lcprac list [-topic X] [-kind K] [-diff D] [-builtin]
+      List matching drills without running them. Yours are marked *.
   lcprac topics
       Show topics and how many drills each has.
   lcprac stats [-reset]
       Show what you have practised and what is due to come back.
+  lcprac mine [-init]
+      Show where your own drill files live and what they add. -init writes a
+      commented example you can copy.
+
+  your own drills are any *.json files in that directory, in the same shape as
+  the builtin deck. They are added to the deck automatically; one that reuses a
+  builtin id replaces it. Pass -builtin to drill or list to ignore them.
 
   press h at any prompt for a hint on drills that carry one. Solving with a
   hint still counts, but the drill keeps its place in the schedule.
@@ -79,6 +88,16 @@ func drillFlags(fs *flag.FlagSet) (topic, kind, diff *string) {
 	return topic, kind, diff
 }
 
+// loadDeck returns the deck to work from: builtin plus your own drills unless
+// asked for builtin only.
+func loadDeck(builtinOnly bool) (*drill.Set, error) {
+	if builtinOnly {
+		return drill.Builtin()
+	}
+	set, _, err := drill.Combined()
+	return set, err
+}
+
 func cmdDrill(args []string) error {
 	fs := flag.NewFlagSet("drill", flag.ContinueOnError)
 	topic, kind, diff := drillFlags(fs)
@@ -88,11 +107,12 @@ func cmdDrill(args []string) error {
 	nosave := fs.Bool("nosave", false, "do not record this session in your history")
 	noretry := fs.Bool("noretry", false, "do not re-ask missed drills at the end of the session")
 	nolimit := fs.Bool("nolimit", false, "keep going past the minute budget instead of stopping")
+	builtinOnly := fs.Bool("builtin", false, "use only the builtin deck, ignoring your own drills")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 
-	set, err := drill.Builtin()
+	set, err := loadDeck(*builtinOnly)
 	if err != nil {
 		return err
 	}
@@ -200,10 +220,11 @@ func saveResults(store *progress.Store, rep runner.Report) error {
 func cmdList(args []string) error {
 	fs := flag.NewFlagSet("list", flag.ContinueOnError)
 	topic, kind, diff := drillFlags(fs)
+	builtinOnly := fs.Bool("builtin", false, "use only the builtin deck, ignoring your own drills")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	set, err := drill.Builtin()
+	set, err := loadDeck(*builtinOnly)
 	if err != nil {
 		return err
 	}
@@ -218,7 +239,7 @@ func cmdList(args []string) error {
 		return matches[i].ID < matches[j].ID
 	})
 	for _, d := range matches {
-		fmt.Printf("%-28s %-16s %-11s %-7s %dm  %s\n", d.ID, d.Topic, d.Kind, d.Difficulty, d.EstMinutes, d.Title)
+		fmt.Printf("%s%-28s %-16s %-11s %-7s %dm  %s\n", mark(d), d.ID, d.Topic, d.Kind, d.Difficulty, d.EstMinutes, d.Title)
 	}
 	fmt.Printf("\n%d of %d drills\n", len(matches), set.Len())
 	return nil
@@ -229,7 +250,7 @@ func cmdTopics(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	set, err := drill.Builtin()
+	set, _, err := drill.Combined()
 	if err != nil {
 		return err
 	}
@@ -250,7 +271,7 @@ func cmdStats(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	set, err := drill.Builtin()
+	set, _, err := drill.Combined()
 	if err != nil {
 		return err
 	}
@@ -302,6 +323,14 @@ func cmdStats(args []string) error {
 	}
 	fmt.Printf("history: %s\n", path)
 	return nil
+}
+
+// mark flags a drill you wrote yourself, so your deck is visible in a listing.
+func mark(d drill.Drill) string {
+	if d.Source == drill.SourceUser {
+		return "*"
+	}
+	return " "
 }
 
 // pct renders accuracy, or a placeholder when a topic is untouched.

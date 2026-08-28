@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"os"
 	"path"
 	"sort"
 )
@@ -43,10 +44,27 @@ func LoadFS(fsys fs.FS, dir string) (*Set, error) {
 		if err := json.Unmarshal(b, &batch); err != nil {
 			return nil, fmt.Errorf("parse %s: %w", name, err)
 		}
+		for i := range batch {
+			batch[i].Source = SourceBuiltin
+		}
 		all = append(all, batch...)
 	}
 	if len(all) == 0 {
 		return nil, fmt.Errorf("no drills found in %q", dir)
 	}
 	return NewSet(all)
+}
+
+// readDrillFile reads one JSON array of drills, naming the file in any error
+// so an authoring mistake points at itself.
+func readDrillFile(file string) ([]Drill, error) {
+	b, err := os.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	var ds []Drill
+	if err := json.Unmarshal(b, &ds); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", file, err)
+	}
+	return ds, nil
 }
