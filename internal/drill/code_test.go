@@ -124,3 +124,25 @@ func TestBuiltinTopicsAreUsable(t *testing.T) {
 		}
 	}
 }
+
+// A code drill you cannot start is a dead 5 minutes, so every one ships a
+// nudge that gets you writing without handing over the answer.
+func TestBuiltinCodeDrillsHaveHints(t *testing.T) {
+	set, err := drill.Builtin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range set.All() {
+		if d.Kind != drill.KindCode {
+			continue
+		}
+		if len(d.Hints) == 0 {
+			t.Errorf("%s: code drill has no hints", d.ID)
+		}
+		for i, h := range d.Hints {
+			if strings.Contains(d.Answer, strings.TrimSuffix(h, ".")) {
+				t.Errorf("%s: hint %d is copied out of the answer", d.ID, i+1)
+			}
+		}
+	}
+}

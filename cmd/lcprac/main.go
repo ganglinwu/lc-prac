@@ -60,6 +60,9 @@ func usage() {
   lcprac stats [-reset]
       Show what you have practised and what is due to come back.
 
+  press h at any prompt for a hint on drills that carry one. Solving with a
+  hint still counts, but the drill keeps its place in the schedule.
+
   code drills compile what you write and run real tests against it: type the
   function and end with a line ".", or press e to open $EDITOR.
 
@@ -141,6 +144,19 @@ func openStore() *progress.Store {
 	return store
 }
 
+// outcome maps a graded drill onto the scheduler's view of it. A hint used is
+// what separates a solve from an assist.
+func outcome(res runner.Result) progress.Outcome {
+	switch {
+	case !res.Correct:
+		return progress.Missed
+	case res.Hints > 0:
+		return progress.Assisted
+	default:
+		return progress.Solved
+	}
+}
+
 // saveResults folds the graded drills into history and reports what comes back
 // when, so the scheduling is visible instead of implicit.
 func saveResults(store *progress.Store, rep runner.Report) error {
@@ -150,7 +166,7 @@ func saveResults(store *progress.Store, rep runner.Report) error {
 		if res.Skipped {
 			continue
 		}
-		store.Record(res.Drill.ID, res.Correct, now)
+		store.RecordOutcome(res.Drill.ID, outcome(res), now)
 		recorded++
 	}
 	if recorded == 0 {
@@ -165,7 +181,16 @@ func saveResults(store *progress.Store, rep runner.Report) error {
 			soon++
 		}
 	}
+	hinted := 0
+	for _, res := range rep.Results {
+		if !res.Skipped && res.Correct && res.Hints > 0 {
+			hinted++
+		}
+	}
 	fmt.Printf("\nsaved %d results to %s\n", recorded, store.Path())
+	if hinted > 0 {
+		fmt.Printf("%d solved with a hint, so they hold their place instead of climbing the ladder.\n", hinted)
+	}
 	if soon > 0 {
 		fmt.Printf("%d missed drills come back in ~10 min, ahead of everything else.\n", soon)
 	}
@@ -250,15 +275,16 @@ func cmdStats(args []string) error {
 	}
 
 	now := time.Now()
-	var seen, correct, due int
+	var seen, correct, assisted, due int
 	for _, t := range set.Topics() {
-		var tSeen, tCorrect, tDue, tTouched int
+		var tSeen, tCorrect, tAssisted, tDue, tTouched int
 		for _, d := range set.Filter(t, "", "") {
 			r, ok := store.Get(d.ID)
 			if ok {
 				tTouched++
 				tSeen += r.Seen
 				tCorrect += r.Correct
+				tAssisted += r.Assisted
 			}
 			if store.Due(d.ID, now) {
 				tDue++
@@ -266,10 +292,14 @@ func cmdStats(args []string) error {
 		}
 		seen += tSeen
 		correct += tCorrect
+		assisted += tAssisted
 		due += tDue
 		fmt.Printf("%-16s %2d/%2d drills tried  %s  %2d due\n", t, tTouched, len(set.Filter(t, "", "")), pct(tCorrect, tSeen), tDue)
 	}
 	fmt.Printf("\ntotal: %s over %d attempts, %d of %d drills due now\n", pct(correct, seen), seen, due, set.Len())
+	if assisted > 0 {
+		fmt.Printf("%d of those correct answers needed a hint.\n", assisted)
+	}
 	fmt.Printf("history: %s\n", path)
 	return nil
 }

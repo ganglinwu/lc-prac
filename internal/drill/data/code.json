@@ -13,6 +13,10 @@
     },
     "answer": "func twoSum(nums []int, target int) []int {\n\tseen := make(map[int]int, len(nums))\n\tfor i, v := range nums {\n\t\tif j, ok := seen[target-v]; ok {\n\t\t\treturn []int{j, i}\n\t\t}\n\t\tseen[v] = i\n\t}\n\treturn nil\n}",
     "explanation": "Store value -> index as you go and look for the complement before inserting. Checking first is what stops an element pairing with itself, and it means you never need a second pass.",
+    "hints": [
+      "One map, filled as you go. What do you look up before you insert?",
+      "For nums[i] you want target-nums[i]. Store value -> index."
+    ],
     "refs": [
       "LC 1 Two Sum"
     ]
@@ -31,6 +35,10 @@
     },
     "answer": "func lowerBound(nums []int, target int) int {\n\tlo, hi := 0, len(nums)\n\tfor lo < hi {\n\t\tmid := lo + (hi-lo)/2\n\t\tif nums[mid] < target {\n\t\t\tlo = mid + 1\n\t\t} else {\n\t\t\thi = mid\n\t\t}\n\t}\n\treturn lo\n}",
     "explanation": "Half-open [lo, hi) with hi starting at len(nums) is what lets the answer be len(nums) without a special case. The invariant is that everything below lo is < target and everything from hi up is >= target, so lo is the answer when they meet.",
+    "hints": [
+      "Search the half-open range [0, len(nums)]; the answer can be len(nums).",
+      "Keep the invariant: everything left of lo is < target, everything at hi or beyond is >= target."
+    ],
     "refs": [
       "LC 35 Search Insert Position",
       "LC 34 Find First and Last Position"
@@ -51,6 +59,10 @@
     },
     "answer": "func isPalindrome(s string) bool {\n\ti, j := 0, len(s)-1\n\tfor i < j {\n\t\tfor i < j && !alnum(s[i]) {\n\t\t\ti++\n\t\t}\n\t\tfor i < j && !alnum(s[j]) {\n\t\t\tj--\n\t\t}\n\t\tif lower(s[i]) != lower(s[j]) {\n\t\t\treturn false\n\t\t}\n\t\ti++\n\t\tj--\n\t}\n\treturn true\n}",
     "explanation": "The skip loops need the i < j guard too, otherwise an all-punctuation string walks a pointer off the end. Comparing in place beats building a filtered copy: same time, no allocation.",
+    "hints": [
+      "Two indices walking inward, skipping anything that is not alphanumeric.",
+      "Advance each pointer past junk in its own inner loop, and guard i < j inside those loops too."
+    ],
     "refs": [
       "LC 125 Valid Palindrome"
     ]

@@ -28,6 +28,9 @@ type Result struct {
 	Drill   drill.Drill
 	Correct bool
 	Skipped bool
+	// Hints counts the nudges revealed before answering. A correct answer
+	// with hints is real progress, but weaker than an unaided one.
+	Hints   int
 	Elapsed time.Duration
 }
 
@@ -198,25 +201,33 @@ func (r *Runner) runOne(label string, d drill.Drill) (Result, error) {
 	}
 
 	machineGraded := d.Kind == drill.KindCode && !r.selfGrades(d)
-	switch {
-	case machineGraded:
-		fmt.Fprintf(r.out, "\n%s\n", d.Code.Stub)
-		if r.Editor != nil {
-			fmt.Fprintf(r.out, "\ne to open $EDITOR, or type your code and end with a line \"%s\" (s to skip): ", endMarker)
-		} else {
-			fmt.Fprintf(r.out, "\nType your code and end with a line \"%s\" (s to skip): ", endMarker)
-		}
-	case r.selfGrades(d):
-		fmt.Fprintf(r.out, "\nThink it through, then press enter to reveal (s to skip): ")
-	default:
-		fmt.Fprintf(r.out, "\nYour answer (s to skip): ")
+	keys := "s to skip"
+	if len(d.Hints) > 0 {
+		keys = "h for a hint, s to skip"
 	}
-	input, err := r.readLine()
+	prompt := func() {
+		switch {
+		case machineGraded:
+			if r.Editor != nil {
+				fmt.Fprintf(r.out, "\ne to open $EDITOR, or type your code and end with a line \"%s\" (%s): ", endMarker, keys)
+			} else {
+				fmt.Fprintf(r.out, "\nType your code and end with a line \"%s\" (%s): ", endMarker, keys)
+			}
+		case r.selfGrades(d):
+			fmt.Fprintf(r.out, "\nThink it through, then press enter to reveal (%s): ", keys)
+		default:
+			fmt.Fprintf(r.out, "\nYour answer (%s): ", keys)
+		}
+	}
+	if machineGraded {
+		fmt.Fprintf(r.out, "\n%s\n", d.Code.Stub)
+	}
+	input, hints, err := r.readAnswer(d, prompt)
 	if err != nil {
 		return Result{}, err
 	}
 
-	res := Result{Drill: d}
+	res := Result{Drill: d, Hints: hints}
 	if strings.EqualFold(strings.TrimSpace(input), "s") {
 		res.Skipped = true
 		fmt.Fprintf(r.out, "\nskipped. answer: %s\n", d.Answer)
@@ -256,6 +267,29 @@ func (r *Runner) runOne(label string, d drill.Drill) (Result, error) {
 		fmt.Fprintf(r.out, "\npace: %s on a ~%dm drill.\n", res.Elapsed.Round(time.Second), d.EstMinutes)
 	}
 	return res, nil
+}
+
+// readAnswer prompts until the user gives something that is not a hint
+// request, returning their line and how many hints they burned. Hints are only
+// intercepted on drills that have them, so "h" stays a valid answer elsewhere.
+func (r *Runner) readAnswer(d drill.Drill, prompt func()) (string, int, error) {
+	used := 0
+	for {
+		prompt()
+		line, err := r.readLine()
+		if err != nil {
+			return "", used, err
+		}
+		if len(d.Hints) == 0 || !strings.EqualFold(strings.TrimSpace(line), "h") {
+			return line, used, nil
+		}
+		if used >= len(d.Hints) {
+			fmt.Fprintf(r.out, "\nthat was the last hint.\n")
+			continue
+		}
+		fmt.Fprintf(r.out, "\nhint %d/%d: %s\n", used+1, len(d.Hints), d.Hints[used])
+		used++
+	}
 }
 
 // gradeCode collects the user's source, compiles it against the drill's tests
@@ -360,6 +394,8 @@ func (r *Runner) printSummary(rep Report) {
 		switch {
 		case res.Skipped:
 			mark = "-"
+		case res.Correct && res.Hints > 0:
+			mark = "~"
 		case res.Correct:
 			mark = "+"
 		}

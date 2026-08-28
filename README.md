@@ -89,6 +89,27 @@ time ceiling.
 Free-form kinds are self-graded on purpose: reading the model answer and
 deciding whether you had it is the actual practice.
 
+## Hints
+
+Staring at a blank prompt for four minutes is the failure mode a short session
+cannot afford. Press `h` at any prompt to reveal the next hint (up to three,
+ordered from a nudge towards the idea to a nudge towards the mechanics):
+
+```
+Your answer (h for a hint, s to skip): h
+
+hint 1/2: A subarray sum is a difference of two prefix sums.
+```
+
+A hinted solve still counts as correct for the session score and for accuracy,
+but the scheduler treats it as *assisted*: your streak holds where it is rather
+than advancing, so the drill comes back at the same interval instead of being
+deferred on borrowed help. The summary marks it `~` instead of `+`, and
+`lcprac stats` reports how many correct answers needed a hint.
+
+Every code drill ships hints. Drills without them treat `h` as an ordinary
+answer, so nothing is swallowed.
+
 ## Code drills
 
 A `code` drill is the one kind that is not taken on trust. You get a stub, you

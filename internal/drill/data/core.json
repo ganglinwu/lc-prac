@@ -9,7 +9,9 @@
     "prompt": "You are scanning an array once looking for two numbers that add to target. What do you store in the map, and what do you look up?",
     "answer": "Store value -> index as you go. For each num, look up target-num BEFORE inserting num, so you never pair an element with itself.",
     "explanation": "The map holds everything to the left of the cursor. Checking the complement first is what makes one pass correct; inserting first would let nums[i] match itself when target == 2*nums[i].",
-    "refs": ["LC 1 Two Sum"]
+    "refs": [
+      "LC 1 Two Sum"
+    ]
   },
   {
     "id": "hashmap-anagram-key",
@@ -21,7 +23,9 @@
     "prompt": "You want to group words that are anagrams of each other. What map key do you use, and what is the cost per word?",
     "answer": "Key = canonical form of the word: either the sorted letters (O(k log k) per word) or a 26-length letter count rendered as a string (O(k)).",
     "explanation": "Anagram grouping is a canonical-key problem: pick any function that is equal exactly when the words are anagrams. Counting beats sorting when words are long, sorting is fine when they are short.",
-    "refs": ["LC 49 Group Anagrams"]
+    "refs": [
+      "LC 49 Group Anagrams"
+    ]
   },
   {
     "id": "twoptr-sorted-pair",
@@ -33,7 +37,9 @@
     "prompt": "The array is already sorted and you need a pair summing to target. Describe the pointer moves and why each move is safe.",
     "answer": "lo=0, hi=n-1. If sum < target move lo up, if sum > target move hi down. Safe because when sum is too small, hi is already the largest partner for lo, so lo can never work again.",
     "explanation": "Each move discards an entire row/column of the pair matrix. That exchange argument is the reason the O(n) scan is complete and does not miss a pair.",
-    "refs": ["LC 167 Two Sum II"]
+    "refs": [
+      "LC 167 Two Sum II"
+    ]
   },
   {
     "id": "twoptr-dedupe-inplace",
@@ -45,7 +51,9 @@
     "prompt": "Removing duplicates from a sorted array in place with a slow/fast pointer: state the loop invariant.",
     "answer": "Everything in nums[0:slow+1] is unique and sorted, and fast is the next unexamined element. When nums[fast] != nums[slow], slow++ then copy.",
     "explanation": "Write-pointer problems are easiest to get right by naming the invariant on the prefix you have already committed. The return value is slow+1, a classic off-by-one.",
-    "refs": ["LC 26 Remove Duplicates from Sorted Array"]
+    "refs": [
+      "LC 26 Remove Duplicates from Sorted Array"
+    ]
   },
   {
     "id": "window-shrink-condition",
@@ -57,7 +65,9 @@
     "prompt": "Longest substring without repeating characters. What is in your state, when do you shrink the left edge, and where do you record the answer?",
     "answer": "State = set (or char->last index) of the window. Expand right always; while the new char is already in the window, shrink from the left removing chars. Record the answer after the window is valid again.",
     "explanation": "Longest-valid windows shrink only while invalid and measure after restoring validity. Shortest-valid windows are the mirror image: shrink while still valid and measure before removing.",
-    "refs": ["LC 3 Longest Substring Without Repeating Characters"]
+    "refs": [
+      "LC 3 Longest Substring Without Repeating Characters"
+    ]
   },
   {
     "id": "window-fixed-vs-variable",
@@ -75,7 +85,9 @@
     ],
     "answer": "Fixed window: add nums[r], subtract nums[r-k], no inner while loop",
     "explanation": "\"Exactly length k\" pins the window size, so the left edge is derived from the right one. The inner while loop only appears when the constraint is on the window's content, not its length.",
-    "refs": ["LC 643 Maximum Average Subarray I"]
+    "refs": [
+      "LC 643 Maximum Average Subarray I"
+    ]
   },
   {
     "id": "bsearch-invariant",
@@ -87,7 +99,13 @@
     "prompt": "Write the half-open binary search that returns the first index where pred(i) is true. State lo, hi, the loop condition, and the two updates.",
     "answer": "lo, hi := 0, n. For lo < hi: mid := lo + (hi-lo)/2. If pred(mid) { hi = mid } else { lo = mid + 1 }. Return lo.",
     "explanation": "The half-open [lo, hi) form has one shape for every variant, terminates because the range always shrinks, and returns n when nothing satisfies pred. lo + (hi-lo)/2 avoids overflow in fixed-width languages.",
-    "refs": ["LC 35 Search Insert Position", "LC 278 First Bad Version"]
+    "hints": [
+      "State it about what the two pointers exclude, not about the midpoint."
+    ],
+    "refs": [
+      "LC 35 Search Insert Position",
+      "LC 278 First Bad Version"
+    ]
   },
   {
     "id": "bsearch-rotated",
@@ -99,7 +117,12 @@
     "prompt": "Searching a rotated sorted array. At each mid, what do you decide first, and how?",
     "answer": "Decide which half is sorted: if nums[lo] <= nums[mid] the left half is sorted, else the right half is. Then check whether the target lies inside that sorted half; if yes recurse there, otherwise go the other way.",
     "explanation": "At least one half of a rotated array is always sorted, so the only real question is which one. Range-check the target against the sorted half, since that is the only half where comparison is trustworthy.",
-    "refs": ["LC 33 Search in Rotated Sorted Array"]
+    "hints": [
+      "One of the two halves is always sorted. Which half, and how do you tell?"
+    ],
+    "refs": [
+      "LC 33 Search in Rotated Sorted Array"
+    ]
   },
   {
     "id": "bsearch-on-answer",
@@ -111,7 +134,13 @@
     "prompt": "\"Minimum eating speed to finish in h hours.\" The input is not sorted. What are you binary searching over, and what makes it valid?",
     "answer": "Search over the candidate answer range (speed 1..max(pile)). Valid because feasible(speed) is monotone: if a speed works, every faster speed works, so the predicate is a step function.",
     "explanation": "This is the single highest-value pattern to re-learn. Whenever a feasibility check is monotone in a numeric parameter, binary search the parameter and pay O(n log range) instead of searching the input.",
-    "refs": ["LC 875 Koko Eating Bananas", "LC 1011 Capacity To Ship Packages"]
+    "hints": [
+      "The array is not what you are searching. What is monotonic here?"
+    ],
+    "refs": [
+      "LC 875 Koko Eating Bananas",
+      "LC 1011 Capacity To Ship Packages"
+    ]
   },
   {
     "id": "stack-monotonic-next-greater",
@@ -123,7 +152,13 @@
     "prompt": "Next greater element to the right, for every index. What sits on the stack, and when do you pop?",
     "answer": "Push indices whose answer is still unknown, kept in decreasing value order. On each new element, pop while nums[stack.top] < nums[i] and assign nums[i] as their answer, then push i.",
     "explanation": "Store indices, not values, so you can write into the answer slot. Each index is pushed and popped at most once, which is why the whole scan is O(n) despite the inner loop.",
-    "refs": ["LC 496 Next Greater Element I", "LC 739 Daily Temperatures"]
+    "hints": [
+      "What is still on the stack when you pop, and why was it waiting there?"
+    ],
+    "refs": [
+      "LC 496 Next Greater Element I",
+      "LC 739 Daily Temperatures"
+    ]
   },
   {
     "id": "stack-paren-validity",
@@ -135,7 +170,9 @@
     "prompt": "Matching brackets with a stack: name the two failure cases and the final check.",
     "answer": "Fail if a closer arrives with an empty stack, and fail if the closer does not match the popped opener. At the end the stack must be empty, otherwise there are unclosed openers.",
     "explanation": "Most wrong answers pass the two in-loop checks but forget the terminal emptiness check, so \"(((\" is wrongly accepted.",
-    "refs": ["LC 20 Valid Parentheses"]
+    "refs": [
+      "LC 20 Valid Parentheses"
+    ]
   },
   {
     "id": "heap-topk-direction",
@@ -153,7 +190,10 @@
     ],
     "answer": "A min-heap of size k; pop the smallest when the size exceeds k",
     "explanation": "The heap's root must be the element most eligible for eviction. For k largest, the weakest survivor is the smallest, so the root has to be the minimum. It is inverted from the instinct every time.",
-    "refs": ["LC 215 Kth Largest Element", "LC 703 Kth Largest in a Stream"]
+    "refs": [
+      "LC 215 Kth Largest Element",
+      "LC 703 Kth Largest in a Stream"
+    ]
   },
   {
     "id": "heap-topk-complexity",
@@ -165,7 +205,12 @@
     "prompt": "Time complexity of finding the k largest of n elements with a size-k heap?",
     "answer": "O(n log k)",
     "explanation": "n elements each do at most one push and one pop on a heap of height log k. Beats O(n log n) sorting when k is small, and the space is O(k) instead of O(n).",
-    "refs": ["LC 215 Kth Largest Element"]
+    "hints": [
+      "Heap size is bounded by k, and every element goes through it once."
+    ],
+    "refs": [
+      "LC 215 Kth Largest Element"
+    ]
   },
   {
     "id": "bfs-vs-dfs-shortest",
@@ -183,7 +228,9 @@
     ],
     "answer": "BFS, marking visited at enqueue time",
     "explanation": "BFS reaches every node by a shortest path first because it explores in layer order. Marking at enqueue (not dequeue) prevents the same cell from entering the queue several times in one layer.",
-    "refs": ["LC 1091 Shortest Path in Binary Matrix"]
+    "refs": [
+      "LC 1091 Shortest Path in Binary Matrix"
+    ]
   },
   {
     "id": "graph-islands-visit",
@@ -195,7 +242,9 @@
     "prompt": "Count connected components of land in a grid. Sketch the outer loop and what the inner traversal does.",
     "answer": "Loop every cell; when you see unvisited land, increment the count and flood fill (BFS or DFS) marking the whole component visited. Cells already visited are skipped.",
     "explanation": "The component count is the number of times you had to start a fresh traversal. Marking visited during the fill is what keeps the total work O(rows*cols) instead of re-walking components.",
-    "refs": ["LC 200 Number of Islands"]
+    "refs": [
+      "LC 200 Number of Islands"
+    ]
   },
   {
     "id": "graph-cycle-detect-directed",
@@ -207,7 +256,12 @@
     "prompt": "Course schedule: can all courses be finished? Give both standard approaches.",
     "answer": "Either DFS with three colors (white/gray/black) where hitting a gray node means a cycle, or Kahn's BFS topological sort where finishing fewer than n nodes means a cycle.",
     "explanation": "A two-state visited set is the classic bug: in a directed graph, revisiting a finished node is fine, only revisiting a node still on the current recursion stack is a cycle.",
-    "refs": ["LC 207 Course Schedule"]
+    "hints": [
+      "Two visited states are not enough for a directed graph."
+    ],
+    "refs": [
+      "LC 207 Course Schedule"
+    ]
   },
   {
     "id": "tree-inorder-bst",
@@ -219,7 +273,10 @@
     "prompt": "Why is in-order traversal the go-to for BST problems, and how do you validate a BST with it?",
     "answer": "In-order visits a BST in sorted order. Validate by tracking the previously visited value and failing if the current value is not strictly greater.",
     "explanation": "The common wrong validation compares each node only against its two children, which accepts trees that violate an ancestor's bound. In-order with a running previous value, or passing down (min, max) bounds, both fix it.",
-    "refs": ["LC 98 Validate Binary Search Tree", "LC 230 Kth Smallest in a BST"]
+    "refs": [
+      "LC 98 Validate Binary Search Tree",
+      "LC 230 Kth Smallest in a BST"
+    ]
   },
   {
     "id": "tree-depth-recursion",
@@ -231,7 +288,9 @@
     "prompt": "Write maxDepth(root *TreeNode) int in Go.",
     "answer": "func maxDepth(root *TreeNode) int {\n\tif root == nil {\n\t\treturn 0\n\t}\n\tl, r := maxDepth(root.Left), maxDepth(root.Right)\n\tif l > r {\n\t\treturn l + 1\n\t}\n\treturn r + 1\n}",
     "explanation": "Base case on nil (not on leaf), combine children, add one. Almost every tree DP is this shape: recurse both sides, then compute the node's value from the two results.",
-    "refs": ["LC 104 Maximum Depth of Binary Tree"]
+    "refs": [
+      "LC 104 Maximum Depth of Binary Tree"
+    ]
   },
   {
     "id": "dp-climb-stairs-recurrence",
@@ -243,7 +302,9 @@
     "prompt": "Climbing stairs with 1 or 2 steps: what is the recurrence, the base cases, and the space you actually need?",
     "answer": "dp[i] = dp[i-1] + dp[i-2], with dp[0]=1 and dp[1]=1. Only two rolling variables are needed, so O(1) space.",
     "explanation": "Define dp[i] as \"number of ways to reach step i\" and the recurrence writes itself from the last move taken. Whenever the recurrence only reaches back a fixed distance, the array collapses to a few variables.",
-    "refs": ["LC 70 Climbing Stairs"]
+    "refs": [
+      "LC 70 Climbing Stairs"
+    ]
   },
   {
     "id": "dp-house-robber-state",
@@ -255,7 +316,9 @@
     "prompt": "House robber: you cannot rob two adjacent houses. Define dp[i] precisely and give the transition.",
     "answer": "dp[i] = best total using the first i+1 houses. dp[i] = max(dp[i-1], dp[i-2] + nums[i]): skip house i, or rob it and take the best from two back.",
     "explanation": "The transition is a decision at index i: skip or take. Getting the state definition ('best over the prefix', not 'best ending at i') right is what makes the answer dp[n-1] instead of a max over the array.",
-    "refs": ["LC 198 House Robber"]
+    "refs": [
+      "LC 198 House Robber"
+    ]
   },
   {
     "id": "dp-kadane",
@@ -267,7 +330,12 @@
     "prompt": "Maximum subarray sum. What are the two running values, and how does each update?",
     "answer": "cur = max(nums[i], cur+nums[i]) is the best sum ending exactly at i; best = max(best, cur) is the answer so far. Initialise both to nums[0].",
     "explanation": "Here the state IS 'ending at i', because a subarray must be contiguous. cur restarting at nums[i] is the decision to abandon a prefix that has gone negative. Starting best at 0 breaks all-negative inputs.",
-    "refs": ["LC 53 Maximum Subarray"]
+    "hints": [
+      "The state is about subarrays ending at i, not subarrays anywhere in [0,i]."
+    ],
+    "refs": [
+      "LC 53 Maximum Subarray"
+    ]
   },
   {
     "id": "complexity-sort-then-scan",
@@ -279,7 +347,9 @@
     "prompt": "You sort an array of n items, then make one linear pass. Overall time complexity?",
     "answer": "O(n log n)",
     "explanation": "Sequential phases add, and the sum is dominated by the largest term: n log n + n = O(n log n). The linear pass is free in asymptotic terms.",
-    "refs": ["LC 56 Merge Intervals"]
+    "refs": [
+      "LC 56 Merge Intervals"
+    ]
   },
   {
     "id": "complexity-recursion-tree",
@@ -291,7 +361,12 @@
     "prompt": "Generating all subsets of n distinct elements, copying each subset into the output. Time complexity?",
     "answer": "O(n * 2^n)",
     "explanation": "There are 2^n subsets and copying one costs up to O(n). Backtracking costs are usually (number of outputs) x (cost per output), not just the number of recursive calls.",
-    "refs": ["LC 78 Subsets"]
+    "hints": [
+      "Count the nodes per level and the work per node, then sum the levels."
+    ],
+    "refs": [
+      "LC 78 Subsets"
+    ]
   },
   {
     "id": "backtracking-template",
@@ -303,6 +378,9 @@
     "prompt": "Write the four lines of the generic backtracking loop body, and say what is easy to get wrong in Go.",
     "answer": "choose (append to path), recurse with the narrowed range, un-choose (path = path[:len(path)-1]). In Go you must copy the path before appending it to the results, since the backing array is reused.",
     "explanation": "append(res, path) stores a slice header aliasing a buffer you are about to mutate, so every stored answer ends up identical. append([]int{}, path...) is the fix.",
-    "refs": ["LC 78 Subsets", "LC 46 Permutations"]
+    "refs": [
+      "LC 78 Subsets",
+      "LC 46 Permutations"
+    ]
   }
 ]

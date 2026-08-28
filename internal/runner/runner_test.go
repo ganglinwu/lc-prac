@@ -409,3 +409,57 @@ func TestSlowDrillGetsAPaceNote(t *testing.T) {
 		t.Errorf("a drill well over its estimate should get a pace note, got:\n%s", out)
 	}
 }
+
+func hintedDrill() drill.Drill {
+	d := choiceDrill()
+	d.Hints = []string{"first nudge", "second nudge"}
+	return d
+}
+
+func TestHintsRevealOneAtATimeAndCount(t *testing.T) {
+	rep, out := runWith(t, "h\nh\n2\n", hintedDrill())
+	if len(rep.Results) != 1 || rep.Results[0].Hints != 2 {
+		t.Fatalf("Hints = %v, want 2", rep.Results)
+	}
+	if !rep.Results[0].Correct {
+		t.Error("a hinted answer is still correct")
+	}
+	if !strings.Contains(out, "hint 1/2: first nudge") || !strings.Contains(out, "hint 2/2: second nudge") {
+		t.Errorf("both hints should appear in order:\n%s", out)
+	}
+	if strings.Index(out, "first nudge") > strings.Index(out, "second nudge") {
+		t.Error("hints came out of order")
+	}
+}
+
+func TestHintsStopAtTheLastOne(t *testing.T) {
+	_, out := runWith(t, "h\nh\nh\n2\n", hintedDrill())
+	if !strings.Contains(out, "that was the last hint") {
+		t.Errorf("asking past the end should say so:\n%s", out)
+	}
+}
+
+func TestHintKeyIsAnAnswerWhenDrillHasNoHints(t *testing.T) {
+	// "h" must stay usable as an answer, not silently eat the turn.
+	rep, out := runWith(t, "h\n", complexityDrill())
+	if len(rep.Results) != 1 || rep.Results[0].Correct {
+		t.Fatalf("want one wrong result, got %+v", rep.Results)
+	}
+	if strings.Contains(out, "hint") {
+		t.Errorf("no hints to offer, so none should be mentioned:\n%s", out)
+	}
+}
+
+func TestUnhintedDrillsReportZeroHints(t *testing.T) {
+	rep, _ := runWith(t, "2\n", hintedDrill())
+	if rep.Results[0].Hints != 0 {
+		t.Fatalf("Hints = %d, want 0", rep.Results[0].Hints)
+	}
+}
+
+func TestSummaryMarksHintedSolvesApart(t *testing.T) {
+	_, out := runWith(t, "h\n2\n", hintedDrill())
+	if !strings.Contains(out, "~ Choice") {
+		t.Errorf("hinted solve should get its own mark:\n%s", out)
+	}
+}

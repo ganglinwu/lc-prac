@@ -13,6 +13,10 @@
     },
     "answer": "func lengthOfLongestSubstring(s string) int {\n\tlast := make(map[byte]int)\n\tbest, left := 0, 0\n\tfor r := 0; r < len(s); r++ {\n\t\tif j, ok := last[s[r]]; ok && j >= left {\n\t\t\tleft = j + 1\n\t\t}\n\t\tlast[s[r]] = r\n\t\tif r-left+1 > best {\n\t\t\tbest = r - left + 1\n\t\t}\n\t}\n\treturn best\n}",
     "explanation": "The window is valid when it holds no duplicate. Jumping left to j+1 (never backwards, hence the j >= left guard) is what keeps it O(n): \"dvdf\" is the case that catches a left pointer that moves back.",
+    "hints": [
+      "Window [left, right]; the map remembers where each byte was last seen.",
+      "On a repeat, left only ever moves forward: left = max(left, lastSeen+1)."
+    ],
     "refs": [
       "LC 3 Longest Substring Without Repeating Characters"
     ]
@@ -31,6 +35,10 @@
     },
     "answer": "func isValid(s string) bool {\n\tpairs := map[byte]byte{')': '(', ']': '[', '}': '{'}\n\tstack := []byte{}\n\tfor i := 0; i < len(s); i++ {\n\t\tc := s[i]\n\t\tif open, ok := pairs[c]; ok {\n\t\t\tif len(stack) == 0 || stack[len(stack)-1] != open {\n\t\t\t\treturn false\n\t\t\t}\n\t\t\tstack = stack[:len(stack)-1]\n\t\t} else {\n\t\t\tstack = append(stack, c)\n\t\t}\n\t}\n\treturn len(stack) == 0\n}",
     "explanation": "Two failure modes, and both need a check: a closer with the wrong (or no) top, and leftovers on the stack at the end. Dropping the second one makes \"(\" pass.",
+    "hints": [
+      "Push openers, and on a closer check the top of the stack.",
+      "Two ways to return false: a closer with an empty or mismatched stack, and a non-empty stack at the end."
+    ],
     "refs": [
       "LC 20 Valid Parentheses"
     ]
@@ -50,6 +58,10 @@
     },
     "answer": "func reverseList(head *ListNode) *ListNode {\n\tvar prev *ListNode\n\tcur := head\n\tfor cur != nil {\n\t\tnext := cur.Next\n\t\tcur.Next = prev\n\t\tprev = cur\n\t\tcur = next\n\t}\n\treturn prev\n}",
     "explanation": "Three pointers, and the order is the whole drill: save next before you clobber cur.Next, then walk prev and cur forward. You return prev, not cur, because the loop exits with cur == nil.",
+    "hints": [
+      "Three pointers: prev, cur, and the next you must save before overwriting.",
+      "Save next, point cur at prev, then slide prev and cur forward. Return prev."
+    ],
     "refs": [
       "LC 206 Reverse Linked List"
     ]
@@ -69,6 +81,10 @@
     },
     "answer": "func isValidBST(root *TreeNode) bool {\n\tvar check func(n *TreeNode, lo, hi *int) bool\n\tcheck = func(n *TreeNode, lo, hi *int) bool {\n\t\tif n == nil {\n\t\t\treturn true\n\t\t}\n\t\tif lo != nil && n.Val <= *lo {\n\t\t\treturn false\n\t\t}\n\t\tif hi != nil && n.Val >= *hi {\n\t\t\treturn false\n\t\t}\n\t\treturn check(n.Left, lo, &n.Val) && check(n.Right, &n.Val, hi)\n\t}\n\treturn check(root, nil, nil)\n}",
     "explanation": "Comparing each node only with its two children is the classic wrong answer: it accepts a 4 buried in the right subtree of 5. Correctness needs an inherited (lo, hi) range that narrows on the way down.",
+    "hints": [
+      "Checking each node against its two children is not enough; a deep descendant can still violate.",
+      "Pass a (low, high) bound down; going left tightens high, going right tightens low."
+    ],
     "refs": [
       "LC 98 Validate Binary Search Tree"
     ]
@@ -87,6 +103,10 @@
     },
     "answer": "func rob(nums []int) int {\n\tprev, cur := 0, 0\n\tfor _, v := range nums {\n\t\ttake := prev + v\n\t\tif take < cur {\n\t\t\ttake = cur\n\t\t}\n\t\tprev, cur = cur, take\n\t}\n\treturn cur\n}",
     "explanation": "cur is the best over houses 0..i, prev the best over 0..i-1. Each house is max(skip = cur, take = prev+v). [2,1,1,2] is the case that catches a greedy \"alternate houses\" solution.",
+    "hints": [
+      "At each house the choice is take it plus what you had two back, or skip it and keep the best so far.",
+      "Two rolling ints: prev2 and prev1, updated as cur = max(prev1, prev2+n)."
+    ],
     "refs": [
       "LC 198 House Robber"
     ]
@@ -106,6 +126,10 @@
     },
     "answer": "func merge(intervals [][]int) [][]int {\n\tsortByStart(intervals)\n\tout := [][]int{}\n\tfor _, iv := range intervals {\n\t\tn := len(out)\n\t\tif n > 0 && iv[0] <= out[n-1][1] {\n\t\t\tif iv[1] > out[n-1][1] {\n\t\t\t\tout[n-1][1] = iv[1]\n\t\t\t}\n\t\t\tcontinue\n\t\t}\n\t\tout = append(out, []int{iv[0], iv[1]})\n\t}\n\treturn out\n}",
     "explanation": "Sorting by start is what makes a single pass enough: any interval that overlaps the running one must start inside it. The two traps are [1,4],[2,3] (the new end can be smaller, so take the max) and forgetting that <= merges touching intervals.",
+    "hints": [
+      "Sort by start first, then walk once holding the interval you are currently extending.",
+      "Overlap means next.start <= cur.end; then cur.end = max(cur.end, next.end)."
+    ],
     "refs": [
       "LC 56 Merge Intervals"
     ]
@@ -124,6 +148,10 @@
     },
     "answer": "func subarraySum(nums []int, k int) int {\n\tcounts := map[int]int{0: 1}\n\tsum, total := 0, 0\n\tfor _, v := range nums {\n\t\tsum += v\n\t\ttotal += counts[sum-k]\n\t\tcounts[sum]++\n\t}\n\treturn total\n}",
     "explanation": "sum(i..j) == prefix[j] - prefix[i-1], so each running sum asks how many earlier prefixes equal sum-k. The seed counts[0] = 1 is the empty prefix, and without it every subarray starting at index 0 is missed.",
+    "hints": [
+      "A subarray sum is a difference of two prefix sums.",
+      "Count prefix sums in a map, seeded with sum 0 -> 1, and at each step add counts[sum-k]."
+    ],
     "refs": [
       "LC 560 Subarray Sum Equals K"
     ]

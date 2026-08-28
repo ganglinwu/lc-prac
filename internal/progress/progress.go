@@ -11,11 +11,22 @@ import (
 	"time"
 )
 
+// Outcome is how one attempt went. Assisted sits between the two: the answer
+// was right, but only after a hint, so it is not yet worth deferring further.
+type Outcome int
+
+const (
+	Missed Outcome = iota
+	Assisted
+	Solved
+)
+
 // Record is the running history of one drill.
 type Record struct {
 	DrillID  string    `json:"drill_id"`
 	Seen     int       `json:"seen"`
 	Correct  int       `json:"correct"`
+	Assisted int       `json:"assisted,omitempty"`
 	Streak   int       `json:"streak"`
 	LastSeen time.Time `json:"last_seen"`
 	DueAt    time.Time `json:"due_at"`
@@ -133,13 +144,28 @@ func (s *Store) Len() int { return len(s.records) }
 
 // Record folds one graded attempt into the history and reschedules the drill.
 func (s *Store) Record(id string, correct bool, now time.Time) Record {
+	o := Missed
+	if correct {
+		o = Solved
+	}
+	return s.RecordOutcome(id, o, now)
+}
+
+// RecordOutcome is Record with the hinted case spelled out: an assisted answer
+// counts towards accuracy but holds the streak where it is, so the drill comes
+// back at the same interval instead of climbing the ladder on borrowed help.
+func (s *Store) RecordOutcome(id string, o Outcome, now time.Time) Record {
 	r := s.records[id]
 	r.DrillID = id
 	r.Seen++
-	if correct {
+	switch o {
+	case Solved:
 		r.Correct++
 		r.Streak++
-	} else {
+	case Assisted:
+		r.Correct++
+		r.Assisted++
+	default:
 		r.Streak = 0
 	}
 	r.LastSeen = now

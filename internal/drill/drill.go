@@ -59,8 +59,11 @@ type Drill struct {
 	Choices     []string   `json:"choices,omitempty"`
 	Answer      string     `json:"answer"`
 	Explanation string     `json:"explanation"`
-	Refs        []string   `json:"refs,omitempty"`
-	Code        *CodeSpec  `json:"code,omitempty"`
+	// Hints are progressive nudges, revealed one at a time on request. Each
+	// should narrow the search without naming the answer.
+	Hints []string  `json:"hints,omitempty"`
+	Refs  []string  `json:"refs,omitempty"`
+	Code  *CodeSpec `json:"code,omitempty"`
 }
 
 // SelfGraded reports whether the user grades their own answer. Free-form kinds
@@ -101,6 +104,14 @@ func (d Drill) Validate() error {
 	}
 	if strings.TrimSpace(d.Explanation) == "" {
 		return fmt.Errorf("drill %s: missing explanation", d.ID)
+	}
+	if len(d.Hints) > 3 {
+		return fmt.Errorf("drill %s: %d hints, at most 3", d.ID, len(d.Hints))
+	}
+	for i, h := range d.Hints {
+		if strings.TrimSpace(h) == "" {
+			return fmt.Errorf("drill %s: hint %d is empty", d.ID, i+1)
+		}
 	}
 	if d.Kind == KindChoice {
 		if len(d.Choices) < 2 {

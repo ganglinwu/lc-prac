@@ -109,3 +109,27 @@ func TestBuiltinIsValid(t *testing.T) {
 		t.Fatalf("only %d topics: sessions would not be varied", len(set.Topics()))
 	}
 }
+
+func TestHintValidation(t *testing.T) {
+	base := func() Drill {
+		return Drill{
+			ID: "h", Title: "T", Kind: KindRecall, Topic: "dp", Difficulty: Easy,
+			EstMinutes: 2, Prompt: "p", Answer: "a", Explanation: "e",
+		}
+	}
+	ok := base()
+	ok.Hints = []string{"one", "two", "three"}
+	if err := ok.Validate(); err != nil {
+		t.Fatalf("three hints should be fine: %v", err)
+	}
+	tooMany := base()
+	tooMany.Hints = []string{"1", "2", "3", "4"}
+	if err := tooMany.Validate(); err == nil {
+		t.Error("four hints should be rejected")
+	}
+	empty := base()
+	empty.Hints = []string{"fine", "  "}
+	if err := empty.Validate(); err == nil {
+		t.Error("a blank hint should be rejected")
+	}
+}

@@ -118,3 +118,32 @@ func TestDefaultPathPrefersLcpracHome(t *testing.T) {
 		t.Fatalf("DefaultPath with XDG = %q", got)
 	}
 }
+
+func TestAssistedHoldsTheStreak(t *testing.T) {
+	s := New("")
+	now := time.Now()
+	s.Record("d", true, now)
+	s.Record("d", true, now)
+	before, _ := s.Get("d")
+
+	r := s.RecordOutcome("d", Assisted, now)
+	if r.Streak != before.Streak {
+		t.Fatalf("streak = %d, want it held at %d", r.Streak, before.Streak)
+	}
+	if r.Correct != before.Correct+1 || r.Assisted != 1 {
+		t.Fatalf("assisted attempt should count as correct: %+v", r)
+	}
+	if want := now.Add(interval(before.Streak)); !r.DueAt.Equal(want) {
+		t.Fatalf("DueAt = %v, want the same rung %v", r.DueAt, want)
+	}
+}
+
+func TestMissedOutcomeMatchesRecordFalse(t *testing.T) {
+	now := time.Now()
+	a, b := New(""), New("")
+	a.Record("d", true, now)
+	b.Record("d", true, now)
+	if a.Record("d", false, now) != b.RecordOutcome("d", Missed, now) {
+		t.Fatal("Record(false) and RecordOutcome(Missed) should agree")
+	}
+}

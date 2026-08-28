@@ -103,6 +103,9 @@
     "prompt": "In the prefix-sum-count-map solution, why is the map seeded with {0: 1} before the loop?",
     "answer": "It stands for the empty prefix, so a subarray that starts at index 0 and sums to k finds a match. Without it, every such subarray is uncounted.",
     "explanation": "prefix[-1] = 0 is a real prefix, it just has no loop iteration. Seeding is how you give a base case to a running accumulator.",
+    "hints": [
+      "Think about the subarray that starts at index 0."
+    ],
     "refs": [
       "LC 560 Subarray Sum Equals K",
       "LC 523 Continuous Subarray Sum"
@@ -197,6 +200,9 @@
     "prompt": "The input has duplicate values and the output must have no duplicate combinations. What is the standard prune?",
     "answer": "Sort the input, then inside the loop skip when i > start && nums[i] == nums[i-1]: only the first copy of a value may open a branch at a given depth.",
     "explanation": "Duplicates matter per level, not globally, which is why the guard is i > start and not i > 0. Getting that wrong drops valid combinations that legitimately reuse a value at a deeper level.",
+    "hints": [
+      "Sort first. What makes a sibling at the same depth a duplicate?"
+    ],
     "refs": [
       "LC 90 Subsets II",
       "LC 40 Combination Sum II"
@@ -226,6 +232,9 @@
     "prompt": "Longest run of consecutive integers in an unsorted array, in O(n). What is the trick that keeps it linear instead of O(n log n)?",
     "answer": "Put everything in a set, then only start counting up from x when x-1 is absent, so each run is walked exactly once from its true start.",
     "explanation": "Without the x-1 check every element walks its whole run and the total is O(n^2) on one long run. The guard is what amortises the inner loop to O(n) overall.",
+    "hints": [
+      "Only start counting from one specific kind of element, or it is O(n^2)."
+    ],
     "refs": [
       "LC 128 Longest Consecutive Sequence"
     ]
@@ -282,6 +291,9 @@
     "prompt": "Rotate an n x n matrix 90 degrees clockwise using O(1) extra space. What two passes do it?",
     "answer": "Transpose (swap m[i][j] with m[j][i] for j > i), then reverse each row. For counter-clockwise, transpose then reverse each column instead.",
     "explanation": "Decomposing a rotation into two reflections is what avoids the four-way cycle swap and its index arithmetic. The j > i bound matters: looping over all pairs transposes twice and gives you the original back.",
+    "hints": [
+      "Two whole-matrix passes, neither of which is a rotation by itself."
+    ],
     "refs": [
       "LC 48 Rotate Image"
     ]
