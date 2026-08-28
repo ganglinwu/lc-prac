@@ -31,6 +31,7 @@ go run ./cmd/lcprac review               # reread the drills that keep beating y
 go run ./cmd/lcprac review -code         # your own saved code, next to the model answer
 go run ./cmd/lcprac pace                 # how long drills take you vs their estimate
 go run ./cmd/lcprac problems             # the real problems behind the deck, weakest first
+go run ./cmd/lcprac problems 56          # everything you know about one problem
 go run ./cmd/lcprac attempt 56 -failed   # log how a real problem actually went
 go run ./cmd/lcprac note <id> <words>    # keep your own wording on a drill
 go run ./cmd/lcprac add                  # write a drill of your own, one prompt at a time
@@ -210,6 +211,21 @@ you get wrong, then the ones you have never drilled, then the ones you are
 solid on. Each row shows how many drills back the problem and your accuracy
 across all of them, and the tally underneath covers every problem, not just the
 rows shown. `lcprac stats` names the top one and points here.
+
+Name a problem and you get everything lcprac knows about that one question
+instead of the ranking, which is the page to have open the minute before you
+attempt it:
+
+```
+lcprac problems 56              # by number
+lcprac problems merge inter     # or by part of the title
+```
+
+It lists the drills cut from the problem with how each has gone (right/seen,
+due, leech), your own note on each, whether your code for it is kept, and every
+time you sat down and attempted the real thing with what you wrote about it.
+Problems logged with `attempt -new` resolve here too and say plainly that no
+drill covers them yet.
 
 Going the other way, `lcprac drill -problem` spends a sitting on the drills
 behind one real problem, so you can warm up on the pattern right before you

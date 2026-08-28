@@ -29,6 +29,17 @@ func cmdProblems(args []string) error {
 		return err
 	}
 	store := openStore()
+	// A named problem is a detail view rather than a ranking: everything the
+	// app knows about that one question, which is what you want open the
+	// moment before you attempt it.
+	if q := strings.Join(fs.Args(), " "); q != "" {
+		ref, err := resolveProblemRef(set, store, q)
+		if err != nil {
+			return err
+		}
+		writeProblemDetail(os.Stdout, ref, set, store, time.Now())
+		return nil
+	}
 	rows := problemRows(set, store, *topic, time.Now())
 	if len(rows) == 0 {
 		if *topic != "" {

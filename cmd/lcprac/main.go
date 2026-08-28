@@ -95,9 +95,12 @@ func usage() {
   lcprac pace [-n 8] [-topic X] [-all]
       Show how long drills actually take you against their estimate, slowest
       first, plus how many fit a 12 minute sitting.
-  lcprac problems [-n 10] [-topic X] [-all]
+  lcprac problems [-n 10] [-topic X] [-all] [problem]
       Show the real LeetCode problems the deck's drills came from, weakest
-      first, so a refresher can end with one to attempt in full.
+      first, so a refresher can end with one to attempt in full. Name a
+      problem, by number or part of its title, for everything known about
+      that one: its drills and how each has gone, your notes and kept code,
+      and every time you attempted the real thing.
   lcprac note [id] [your words] [-clear]
       Keep your own wording on a drill. It is shown when the drill comes back
       and in review. With no id it lists every note you have written.
