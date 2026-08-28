@@ -73,9 +73,10 @@ func usage() {
   lcprac stats [-reset]
       Show what you have practised, your streak and recent sessions, and
       what is due to come back.
-  lcprac review [-n 5] [-topic X] [-all] [id...]
+  lcprac review [-n 5] [-topic X] [-all] [-code] [id...]
       Reread the drills you keep missing, answers shown. Name ids to read
-      those instead; -all widens it to everything you have ever missed.
+      those instead; -all widens it to everything you have ever missed, and
+      -code shows the code drills you have written a solution for.
   lcprac pace [-n 8] [-topic X] [-all]
       Show how long drills actually take you against their estimate, slowest
       first, plus how many fit a 12 minute sitting.
@@ -100,7 +101,9 @@ func usage() {
   hint still counts, but the drill keeps its place in the schedule.
 
   code drills compile what you write and run real tests against it: type the
-  function and end with a line ".", or press e to open $EDITOR.
+  function and end with a line ".", or press e to open $EDITOR. Your version is
+  kept with the drill's history, so lcprac review -code shows what you wrote
+  next to the model answer.
 
   kinds:        recall, choice, complexity, snippet, code
   difficulties: easy, medium

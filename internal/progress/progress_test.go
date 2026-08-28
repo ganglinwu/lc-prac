@@ -413,3 +413,71 @@ func TestSecondsSurviveSaveAndLoad(t *testing.T) {
 		t.Errorf("Seconds after reload = %d, want 180", r.Seconds)
 	}
 }
+
+func TestSetSolutionKeepsLastAndNeverDowngrades(t *testing.T) {
+	s := New("")
+	now := time.Now()
+	s.Record("a", false, now)
+	s.SetSolution("a", "func first() {}", false, now)
+	if sol, _ := s.Solution("a"); sol.Source != "func first() {}" || sol.Passed {
+		t.Fatalf("Solution = %+v, want the failing first version", sol)
+	}
+	s.Record("a", true, now)
+	s.SetSolution("a", "func working() {}", true, now)
+	if sol, _ := s.Solution("a"); sol.Source != "func working() {}" || !sol.Passed {
+		t.Fatalf("Solution = %+v, want the passing version", sol)
+	}
+	s.SetSolution("a", "func broken() {}", false, now)
+	if sol, _ := s.Solution("a"); sol.Source != "func working() {}" {
+		t.Errorf("a failing attempt replaced a passing solution: %+v", sol)
+	}
+	s.SetSolution("a", "func better() {}", true, now)
+	if sol, _ := s.Solution("a"); sol.Source != "func better() {}" {
+		t.Errorf("a later passing attempt did not replace the old one: %+v", sol)
+	}
+}
+
+func TestSetSolutionIgnoresUnattemptedAndEmpty(t *testing.T) {
+	s := New("")
+	now := time.Now()
+	s.SetSolution("never-seen", "func x() {}", true, now)
+	if _, ok := s.Get("never-seen"); ok {
+		t.Error("SetSolution created a record for a drill with no attempt")
+	}
+	s.SetNote("noted", "my words")
+	s.SetSolution("noted", "func x() {}", true, now)
+	if _, ok := s.Solution("noted"); ok {
+		t.Error("a note-only record picked up a solution")
+	}
+	s.Record("a", true, now)
+	s.SetSolution("a", "  \n ", true, now)
+	if _, ok := s.Solution("a"); ok {
+		t.Error("an empty submission was saved")
+	}
+}
+
+func TestSolvedListsAndSurvivesSaveAndLoad(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "progress.json")
+	s := New(path)
+	now := time.Now()
+	s.Record("a", true, now)
+	s.SetSolution("a", "func a() {}", true, now)
+	s.Record("b", true, now)
+
+	solved := s.Solved()
+	if len(solved) != 1 || solved[0].DrillID != "a" {
+		t.Fatalf("Solved() = %+v, want only a", solved)
+	}
+	if err := s.Save(); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sol, ok := loaded.Solution("a")
+	if !ok || sol.Source != "func a() {}" || !sol.Passed {
+		t.Errorf("after reload Solution = %+v, %v", sol, ok)
+	}
+}

@@ -37,6 +37,17 @@ type Record struct {
 	// Seconds is the total time spent on this drill across every attempt,
 	// which is what makes pacing (not just accuracy) reviewable.
 	Seconds int `json:"seconds,omitempty"`
+	// Solution is the code you last wrote for a code drill, kept so you can
+	// reread your own working version next to the model answer.
+	Solution *Solution `json:"solution,omitempty"`
+}
+
+// Solution is one saved attempt at a code drill: the source you submitted and
+// whether it passed the drill's tests.
+type Solution struct {
+	Source string    `json:"source"`
+	Passed bool      `json:"passed"`
+	At     time.Time `json:"at"`
 }
 
 // AvgSeconds is how long an attempt at this drill takes on average, rounded
@@ -246,6 +257,42 @@ func (s *Store) AddTime(id string, d time.Duration) {
 	}
 	r.Seconds += int(d.Round(time.Second) / time.Second)
 	s.records[id] = r
+}
+
+// SetSolution keeps the code you wrote for a drill. Like AddTime it only
+// touches a drill you have actually attempted, and a version that passed is
+// never replaced by one that failed: the point is to have your working answer
+// to come back to.
+func (s *Store) SetSolution(id, source string, passed bool, now time.Time) {
+	r, ok := s.records[id]
+	if !ok || r.Seen == 0 || strings.TrimSpace(source) == "" {
+		return
+	}
+	if r.Solution != nil && r.Solution.Passed && !passed {
+		return
+	}
+	r.Solution = &Solution{Source: source, Passed: passed, At: now}
+	s.records[id] = r
+}
+
+// Solution returns your saved code for a drill, if any.
+func (s *Store) Solution(id string) (Solution, bool) {
+	r, ok := s.records[id]
+	if !ok || r.Solution == nil {
+		return Solution{}, false
+	}
+	return *r.Solution, true
+}
+
+// Solved returns every record carrying saved code, ordered by drill id.
+func (s *Store) Solved() []Record {
+	var out []Record
+	for _, r := range s.Records() {
+		if r.Solution != nil {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 // Timed returns every record that has time recorded against it, ordered by

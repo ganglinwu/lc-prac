@@ -39,7 +39,10 @@ type Result struct {
 	// Attempts counts compile-and-run tries on a code drill. Zero on every
 	// other kind.
 	Attempts int
-	Elapsed  time.Duration
+	// Source is the last code submitted on a code drill, so it can be kept
+	// and reread later. Empty on every other kind.
+	Source  string
+	Elapsed time.Duration
 }
 
 // Report is the tally for a whole session. Retries holds the second-pass
@@ -257,6 +260,7 @@ func (r *Runner) runOne(label string, d drill.Drill, deadline time.Time) (Result
 		}
 		res.Correct = out.correct
 		res.Attempts = out.attempts
+		res.Source = out.source
 		res.Hints += out.hints
 		fmt.Fprintf(r.out, "\n%s\n", d.Explanation)
 	} else if r.selfGrades(d) {
@@ -339,6 +343,9 @@ type codeOutcome struct {
 	correct  bool
 	attempts int
 	hints    int
+	// source is the last version compiled, kept so the session can save your
+	// own working answer alongside the model one.
+	source string
 }
 
 // codeAttempts is the try ceiling for one code drill.
@@ -371,6 +378,7 @@ func (r *Runner) gradeCode(d drill.Drill, first string, deadline time.Time) (cod
 			return out, nil
 		}
 		out.attempts++
+		out.source = src
 
 		fmt.Fprintln(r.out, "\ncompiling and running the tests...")
 		res, err := r.Grade(context.Background(), codecheck.Program{

@@ -18,6 +18,7 @@ func cmdReview(args []string) error {
 	topic := fs.String("topic", "", "only this topic")
 	n := fs.Int("n", 5, "how many drills to show (0 = all)")
 	all := fs.Bool("all", false, "show every drill you have ever missed, not just the sticky ones")
+	code := fs.Bool("code", false, "show the code drills you have written a solution for")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -39,11 +40,14 @@ func cmdReview(args []string) error {
 		return nil
 	}
 
-	picked := pickReview(set, store, *topic, *n, *all)
+	picked := pickReview(set, store, *topic, *n, *all, *code)
 	if len(picked) == 0 {
-		if store.Len() == 0 {
+		switch {
+		case store.Len() == 0:
 			fmt.Println("no history yet: run `lcprac drill` first.")
-		} else {
+		case *code:
+			fmt.Println("no saved code yet: solve a code drill and your version is kept here.")
+		default:
 			fmt.Println("nothing to review: no drill has beaten you enough times to stick out.")
 			fmt.Println("`lcprac review -all` shows everything you have ever missed.")
 		}
@@ -63,18 +67,24 @@ type reviewItem struct {
 }
 
 // pickReview chooses what to reread: leeches by default, anything ever missed
-// with -all. Records with no matching drill (a deleted user drill) are dropped.
-func pickReview(set *drill.Set, store *progress.Store, topic string, n int, all bool) []reviewItem {
+// with -all, your own saved code with -code. Records with no matching drill (a
+// deleted user drill) are dropped.
+func pickReview(set *drill.Set, store *progress.Store, topic string, n int, all, code bool) []reviewItem {
 	var out []reviewItem
-	for _, r := range store.Leeches() {
-		out = append(out, reviewItem{record: r})
-	}
-	if all {
-		out = nil
+	switch {
+	case code:
+		for _, r := range store.Solved() {
+			out = append(out, reviewItem{record: r})
+		}
+	case all:
 		for _, r := range store.Records() {
 			if r.Misses() > 0 {
 				out = append(out, reviewItem{record: r})
 			}
+		}
+	default:
+		for _, r := range store.Leeches() {
+			out = append(out, reviewItem{record: r})
 		}
 	}
 	var kept []reviewItem
@@ -109,6 +119,13 @@ func writeReview(w io.Writer, d drill.Drill, r progress.Record, spaced bool) {
 	}
 	fmt.Fprintf(w, "\nanswer:\n%s\n", indent(d.Answer))
 	fmt.Fprintf(w, "why:\n%s\n", indent(d.Explanation))
+	if r.Solution != nil {
+		state := "did not pass"
+		if r.Solution.Passed {
+			state = "passed"
+		}
+		fmt.Fprintf(w, "your code (%s, %s):\n%s\n", state, r.Solution.At.Format("2 Jan 2006"), indent(r.Solution.Source))
+	}
 	if r.Note != "" {
 		fmt.Fprintf(w, "your note:\n%s\n", indent(r.Note))
 	}

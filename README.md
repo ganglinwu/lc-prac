@@ -27,6 +27,7 @@ go run ./cmd/lcprac list                 # every drill, no session
 go run ./cmd/lcprac topics               # topics and their drill counts
 go run ./cmd/lcprac stats                # accuracy, streak, recent sessions, what is due
 go run ./cmd/lcprac review               # reread the drills that keep beating you
+go run ./cmd/lcprac review -code         # your own saved code, next to the model answer
 go run ./cmd/lcprac pace                 # how long drills take you vs their estimate
 go run ./cmd/lcprac note <id> <words>    # keep your own wording on a drill
 go run ./cmd/lcprac add                  # write a drill of your own, one prompt at a time
@@ -143,6 +144,7 @@ lcprac review                 # up to 5, worst first
 lcprac review -n 0            # all of them
 lcprac review -topic dp       # only one topic
 lcprac review -all            # everything you have ever missed once
+lcprac review -code           # code drills you have written a solution for
 lcprac review hashmap-two-sum-code # any drill by id, history or not
 ```
 
@@ -253,6 +255,15 @@ if the session clock runs out mid-drill, unless you passed `-nolimit`.
 Solving on the second or third try still counts as a solve and advances the
 repetition ladder: you got there yourself. The summary shows the try count next
 to the drill.
+
+### Your version is kept
+
+The last source you submitted is saved with the drill's history, so
+`lcprac review -code` (or `lcprac review <id>`) shows what you wrote under the
+model answer, dated and marked passed or not. It is written as soon as the
+drill is graded, so a sitting cut short with Ctrl-C still keeps it. A version
+that passed is never overwritten by a later failing attempt, and only a drill
+you actually attempted can carry one.
 
 The generated module has no dependencies and is built with `GOPROXY=off`, so
 grading is offline and cannot pull anything. Your source lands in its own file,

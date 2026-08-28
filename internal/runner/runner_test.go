@@ -696,3 +696,20 @@ func TestRunWithoutNoteSaysNothing(t *testing.T) {
 		t.Fatalf("unexpected note line:\n%s", out)
 	}
 }
+
+func TestCodeDrillResultCarriesTheLastSourceYouWrote(t *testing.T) {
+	grade, _ := failThenPass(2)
+	input := "func add(a, b int) int { return 0 }\n.\nr\nfunc add(a, b int) int { return a + b }\n.\n"
+	rep, _ := runCodeTries(t, 3, input, grade, nil, codeDrill())
+
+	if got := rep.Results[0].Source; got != "func add(a, b int) int { return a + b }" {
+		t.Errorf("Source = %q, want the version that passed", got)
+	}
+}
+
+func TestNonCodeDrillCarriesNoSource(t *testing.T) {
+	rep, _ := runCode(t, "1\n", nil, nil, choiceDrill())
+	if got := rep.Results[0].Source; got != "" {
+		t.Errorf("Source = %q on a non-code drill, want empty", got)
+	}
+}

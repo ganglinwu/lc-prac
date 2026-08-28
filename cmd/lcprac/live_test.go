@@ -162,3 +162,38 @@ func TestLiveRecordSavesElapsed(t *testing.T) {
 		t.Error("a skipped drill was timed; it was never attempted")
 	}
 }
+
+// Saving your code as you go is what makes a Ctrl-C'd session still worth
+// something: the version you wrote is on disk before the sitting ends.
+func TestLiveRecordSavesYourCode(t *testing.T) {
+	live, _, path := testLive(t)
+	res := result("k", true, 0, false)
+	res.Source = "func add(a, b int) int { return a + b }"
+	live.record(res)
+
+	reloaded, err := progress.Load(path)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	sol, ok := reloaded.Solution("k")
+	if !ok {
+		t.Fatal("no solution saved for k")
+	}
+	if sol.Source != res.Source || !sol.Passed {
+		t.Errorf("solution = %+v, want the passing source", sol)
+	}
+	if _, ok := reloaded.Solution("nothing"); ok {
+		t.Error("a drill never answered has a solution")
+	}
+}
+
+func TestLiveRecordSkippedDrillSavesNoCode(t *testing.T) {
+	live, _, _ := testLive(t)
+	res := result("k", false, 0, true)
+	res.Source = "func add(a, b int) int { return 0 }"
+	live.record(res)
+
+	if _, ok := live.store.Solution("k"); ok {
+		t.Error("a skipped drill saved code")
+	}
+}

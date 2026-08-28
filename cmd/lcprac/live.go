@@ -49,6 +49,7 @@ func (l *liveProgress) record(res runner.Result) {
 	}
 	l.store.RecordOutcome(res.Drill.ID, outcome(res), l.now())
 	l.store.AddTime(res.Drill.ID, res.Elapsed)
+	l.store.SetSolution(res.Drill.ID, res.Source, res.Correct, l.now())
 	l.recorded++
 	switch {
 	case !res.Correct:
