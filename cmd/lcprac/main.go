@@ -49,7 +49,7 @@ func run(args []string) error {
 func usage() {
 	fmt.Fprint(os.Stderr, `lcprac - short LeetCode pattern drills
 
-  lcprac drill [-m 12] [-topic X] [-kind K] [-diff D] [-seed N]
+  lcprac drill [-m 12] [-topic X] [-kind K] [-diff D] [-seed N] [-noretry]
       Run a timed session that fits the minute budget (default 12).
   lcprac list [-topic X] [-kind K] [-diff D]
       List matching drills without running them.
@@ -78,6 +78,7 @@ func cmdDrill(args []string) error {
 	seed := fs.Uint64("seed", 0, "seed for drill selection (0 = random)")
 	shuffle := fs.Bool("shuffle", false, "ignore spaced repetition and pick at random")
 	nosave := fs.Bool("nosave", false, "do not record this session in your history")
+	noretry := fs.Bool("noretry", false, "do not re-ask missed drills at the end of the session")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -105,7 +106,9 @@ func cmdDrill(args []string) error {
 	if err != nil {
 		return err
 	}
-	rep, err := runner.New(os.Stdin, os.Stdout).Run(s)
+	run := runner.New(os.Stdin, os.Stdout)
+	run.RetryMisses = !*noretry
+	rep, err := run.Run(s)
 	if err != nil {
 		return err
 	}

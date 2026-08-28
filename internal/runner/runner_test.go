@@ -60,8 +60,14 @@ func TestCheckAnswer(t *testing.T) {
 
 func runWith(t *testing.T, input string, ds ...drill.Drill) (Report, string) {
 	t.Helper()
+	return runRetry(t, false, input, ds...)
+}
+
+func runRetry(t *testing.T, retry bool, input string, ds ...drill.Drill) (Report, string) {
+	t.Helper()
 	var out strings.Builder
 	r := New(strings.NewReader(input), &out)
+	r.RetryMisses = retry
 	tick := 0
 	r.Now = func() time.Time {
 		tick++
@@ -119,5 +125,65 @@ func TestRunStopsCleanlyOnEOF(t *testing.T) {
 	}
 	if !strings.Contains(out, "1/1 correct") {
 		t.Errorf("summary missing from output:\n%s", out)
+	}
+}
+
+func TestRetryPassReAsksOnlyMisses(t *testing.T) {
+	// wrong choice, right complexity, then the retry answer for the choice.
+	rep, out := runRetry(t, true, "1\nO(n log k)\n2\n", choiceDrill(), complexityDrill())
+	if correct, attempted := rep.Score(); correct != 1 || attempted != 2 {
+		t.Fatalf("Score() = %d/%d, want 1/2", correct, attempted)
+	}
+	if len(rep.Retries) != 1 {
+		t.Fatalf("expected 1 retry, got %d", len(rep.Retries))
+	}
+	if rep.Retries[0].Drill.ID != "c" || !rep.Retries[0].Correct {
+		t.Errorf("retry should be the missed choice drill, answered right: %+v", rep.Retries[0])
+	}
+	if !strings.Contains(out, "[retry 1/1]") || !strings.Contains(out, "second pass: 1/1") {
+		t.Errorf("retry pass not visible in output:\n%s", out)
+	}
+}
+
+func TestRetryPassDoesNotChangeScore(t *testing.T) {
+	// Getting it right on the second pass must not erase the first-pass miss,
+	// or the scheduler would stop bringing the drill back.
+	rep, _ := runRetry(t, true, "1\n2\n", choiceDrill())
+	if correct, attempted := rep.Score(); correct != 0 || attempted != 1 {
+		t.Fatalf("Score() = %d/%d, want 0/1", correct, attempted)
+	}
+	if len(rep.Missed()) != 1 {
+		t.Fatalf("Missed() = %d, want 1", len(rep.Missed()))
+	}
+}
+
+func TestNoRetryPassWhenDisabled(t *testing.T) {
+	rep, out := runRetry(t, false, "1\n", choiceDrill())
+	if len(rep.Retries) != 0 {
+		t.Fatalf("expected no retries, got %d", len(rep.Retries))
+	}
+	if strings.Contains(out, "second pass") {
+		t.Error("disabled retry pass should print nothing")
+	}
+}
+
+func TestRetryPassStopsOnEOF(t *testing.T) {
+	// Input runs out during the retry; the summary should still print.
+	rep, out := runRetry(t, true, "1\n", choiceDrill())
+	if len(rep.Retries) != 0 {
+		t.Fatalf("expected no completed retries, got %d", len(rep.Retries))
+	}
+	if !strings.Contains(out, "0/1 correct") {
+		t.Errorf("summary missing:\n%s", out)
+	}
+}
+
+func TestSkippedDrillsAreNotRetried(t *testing.T) {
+	rep, out := runRetry(t, true, "s\n", choiceDrill())
+	if len(rep.Retries) != 0 || len(rep.Missed()) != 0 {
+		t.Fatalf("a skip is not a miss: retries=%d missed=%d", len(rep.Retries), len(rep.Missed()))
+	}
+	if strings.Contains(out, "second pass") {
+		t.Error("skips should not trigger a second pass")
 	}
 }

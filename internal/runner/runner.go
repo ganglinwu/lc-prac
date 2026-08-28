@@ -22,10 +22,24 @@ type Result struct {
 	Elapsed time.Duration
 }
 
-// Report is the tally for a whole session.
+// Report is the tally for a whole session. Retries holds the second-pass
+// attempts at drills missed on the first pass; they are reinforcement only and
+// never counted in Score.
 type Report struct {
 	Results []Result
+	Retries []Result
 	Elapsed time.Duration
+}
+
+// Missed lists the drills answered wrong on the first pass.
+func (r Report) Missed() []drill.Drill {
+	var ds []drill.Drill
+	for _, res := range r.Results {
+		if !res.Skipped && !res.Correct {
+			ds = append(ds, res.Drill)
+		}
+	}
+	return ds
 }
 
 // Score returns correct and attempted counts; skipped drills are not attempted.
@@ -48,13 +62,15 @@ type Runner struct {
 	out io.Writer
 	// Now is injectable so tests get deterministic timings.
 	Now func() time.Time
+	// RetryMisses re-asks missed drills once at the end of the session.
+	RetryMisses bool
 }
 
 // New builds a Runner over the given streams.
 func New(in io.Reader, out io.Writer) *Runner {
 	sc := bufio.NewScanner(in)
 	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	return &Runner{in: sc, out: out, Now: time.Now}
+	return &Runner{in: sc, out: out, Now: time.Now, RetryMisses: true}
 }
 
 // Run walks the session, returning once every drill is answered or the input
@@ -66,7 +82,7 @@ func (r *Runner) Run(s session.Session) (Report, error) {
 
 	var rep Report
 	for i, d := range s.Drills {
-		res, err := r.runOne(i+1, len(s.Drills), d)
+		res, err := r.runOne(fmt.Sprintf("%d/%d", i+1, len(s.Drills)), d)
 		if err == io.EOF {
 			break
 		}
@@ -75,14 +91,39 @@ func (r *Runner) Run(s session.Session) (Report, error) {
 		}
 		rep.Results = append(rep.Results, res)
 	}
+	if err := r.retryPass(&rep); err != nil {
+		return rep, err
+	}
 	rep.Elapsed = r.Now().Sub(start)
 	r.printSummary(rep)
 	return rep, nil
 }
 
-func (r *Runner) runOne(n, total int, d drill.Drill) (Result, error) {
+// retryPass re-asks every missed drill once, straight away. Scheduling puts a
+// miss 10 minutes out, which is a later sitting, so without this you never see
+// the drill again while the explanation is still fresh.
+func (r *Runner) retryPass(rep *Report) error {
+	missed := rep.Missed()
+	if !r.RetryMisses || len(missed) == 0 {
+		return nil
+	}
+	fmt.Fprintf(r.out, "\n"+strings.Repeat("-", 60)+"\nsecond pass: %d missed, once more while it is fresh\n", len(missed))
+	for i, d := range missed {
+		res, err := r.runOne(fmt.Sprintf("retry %d/%d", i+1, len(missed)), d)
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		rep.Retries = append(rep.Retries, res)
+	}
+	return nil
+}
+
+func (r *Runner) runOne(label string, d drill.Drill) (Result, error) {
 	started := r.Now()
-	fmt.Fprintf(r.out, "\n[%d/%d] %s  (%s, %s, ~%dm)\n", n, total, d.Title, d.Topic, d.Difficulty, d.EstMinutes)
+	fmt.Fprintf(r.out, "\n[%s] %s  (%s, %s, ~%dm)\n", label, d.Title, d.Topic, d.Difficulty, d.EstMinutes)
 	fmt.Fprintf(r.out, "\n%s\n", d.Prompt)
 	for i, c := range d.Choices {
 		fmt.Fprintf(r.out, "  %d) %s\n", i+1, c)
@@ -143,6 +184,15 @@ func (r *Runner) printSummary(rep Report) {
 			mark = "+"
 		}
 		fmt.Fprintf(r.out, "  %s %s (%s)\n", mark, res.Drill.Title, res.Drill.Topic)
+	}
+	if len(rep.Retries) > 0 {
+		var got int
+		for _, res := range rep.Retries {
+			if res.Correct && !res.Skipped {
+				got++
+			}
+		}
+		fmt.Fprintf(r.out, "second pass: %d/%d (not scored, they still come back)\n", got, len(rep.Retries))
 	}
 }
 
