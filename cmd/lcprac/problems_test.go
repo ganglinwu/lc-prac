@@ -174,7 +174,7 @@ func TestWriteProblemsReportsGapsAndPointsAtAdd(t *testing.T) {
 	rows := []problemRow{{Ref: "LC 128 Longest Consecutive Sequence"}, {Ref: "LC 20 Valid Parentheses", Drills: 1, Topics: []string{"stack"}}}
 	writeProblems(&buf, rows, 0)
 	out := buf.String()
-	for _, want := range []string{"no drill covers it", "1 of them has no drill behind it yet", "next up: `lcprac add` a drill for LC 128"} {
+	for _, want := range []string{"no drill covers it", "1 of them has no drill behind it yet (`lcprac add -problem <n>` to write one)", "next up: `lcprac add -problem 128` a drill for LC 128"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q:\n%s", want, out)
 		}

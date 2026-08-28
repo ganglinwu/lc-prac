@@ -186,7 +186,11 @@ func writeLogged(w io.Writer, ref string, res progress.Result, note string, cove
 		fmt.Fprintf(w, "  note: %s\n", note)
 	}
 	if !covered {
-		fmt.Fprintln(w, "no drill in the deck covers it; `lcprac add` one while it is still fresh.")
+		if n := problemNumber(ref); n != "" {
+			fmt.Fprintf(w, "no drill in the deck covers it; `lcprac add -problem %s` one while it is still fresh.\n", n)
+		} else {
+			fmt.Fprintln(w, "no drill in the deck covers it; `lcprac add` one while it is still fresh.")
+		}
 		return
 	}
 	if res == progress.Passed {

@@ -99,9 +99,12 @@ func usage() {
   lcprac note [id] [your words] [-clear]
       Keep your own wording on a drill. It is shown when the drill comes back
       and in review. With no id it lists every note you have written.
-  lcprac add [-file mine.json]
+  lcprac add [-file mine.json] [-problem X]
       Write a new drill of your own by answering a few prompts. It is appended
       to a file in your drills directory and is in the deck immediately.
+      -problem carries a real problem into the new drill's refs and defaults
+      its title and topic from it, so a gap lcprac problems named can be
+      covered by number, e.g. -problem 261.
   lcprac mine [-init]
       Show where your own drill files live and what they add. -init writes a
       commented example you can copy.

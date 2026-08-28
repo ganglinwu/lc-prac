@@ -190,7 +190,7 @@ func TestWriteLoggedPointsAtAddWhenUncovered(t *testing.T) {
 	var buf bytes.Buffer
 	writeLogged(&buf, "LC 128 Longest Consecutive Sequence", progress.Failed, "", false)
 	out := buf.String()
-	if !strings.Contains(out, "lcprac add") || strings.Contains(out, "-problem") {
+	if !strings.Contains(out, "lcprac add -problem 128") || strings.Contains(out, "drill -problem") {
 		t.Errorf("an uncovered problem should point at add, not a drill session:\n%s", out)
 	}
 }

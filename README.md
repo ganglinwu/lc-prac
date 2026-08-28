@@ -34,6 +34,7 @@ go run ./cmd/lcprac problems             # the real problems behind the deck, we
 go run ./cmd/lcprac attempt 56 -failed   # log how a real problem actually went
 go run ./cmd/lcprac note <id> <words>    # keep your own wording on a drill
 go run ./cmd/lcprac add                  # write a drill of your own, one prompt at a time
+go run ./cmd/lcprac add -problem 261     # ... for one real problem, refs and topic prefilled
 go run ./cmd/lcprac mine                 # your own drills and where they live
 ```
 
@@ -251,8 +252,8 @@ covers. The name is put into the deck's `LC <number> <Title>` shape (so a bare
 `128 ...` becomes `LC 128 ...`), and a name the deck already uses is reused
 rather than duplicated. Those problems appear in `lcprac problems` marked
 "no drill covers it" and ranked as gaps even after you solve them, with the
-summary counting them and pointing at `lcprac add` to write the drill while
-the problem is still fresh.
+summary counting them and pointing at `lcprac add -problem <n>` to write the
+drill while the problem is still fresh.
 
 ## Drill kinds
 
@@ -345,6 +346,7 @@ directory is loaded on top of the builtin deck:
 
 ```
 lcprac add           # answer a few prompts, drill lands in mine.json
+lcprac add -problem 261  # the same, aimed at one real problem
 lcprac mine          # show the directory and what it currently adds
 lcprac mine -init    # write an example.json there to copy
 ```
@@ -356,6 +358,17 @@ and takes the answer by number, so the answer always matches one of them. The
 id is slugged from the title (`mine-...`) and suffixed if it is already taken,
 though you can type your own; reusing a builtin id is allowed and says so,
 since that is how you replace a drill.
+
+`add -problem 261` writes a drill for one real problem: the problem is carried
+into the new drill's refs, and the title and topic prompts default to the
+problem's own name and to whatever topic its existing drills sit in. The query
+is matched the same way `drill -problem` matches it (a bare number is the
+problem's own number, anything else is part of the title), except that matching
+nothing is fine here: it is looked up in your attempt log too, so a gap you
+logged with `attempt -new` can be covered by number, and an unknown name is
+normalised into the deck's `LC <n> <Title>` shape. An ambiguous title is still
+an error rather than a guess. The closing line points at
+`lcprac drill -problem <n>` so you can run the new drill straight away.
 
 Bad input re-asks rather than aborting, Ctrl-D or answering `n` at the
 confirmation writes nothing, and the append goes through a temp file so a

@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -27,6 +28,7 @@ const defaultAddFile = "mine.json"
 func cmdAdd(args []string) error {
 	fs := flag.NewFlagSet("add", flag.ContinueOnError)
 	file := fs.String("file", defaultAddFile, "file in your drills directory to append to")
+	problem := fs.String("problem", "", "write a drill for this real problem, by number or part of its title")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -38,11 +40,17 @@ func cmdAdd(args []string) error {
 	if err != nil {
 		return err
 	}
+	var pre problemPrefill
+	if *problem != "" {
+		if pre, err = prefillFor(deck, openStore(), *problem); err != nil {
+			return err
+		}
+	}
 	path := filepath.Join(dir, filepath.Base(*file))
 	if filepath.Ext(path) != ".json" {
 		path += ".json"
 	}
-	err = addDrill(os.Stdin, os.Stdout, deck, path)
+	err = addDrill(os.Stdin, os.Stdout, deck, path, pre)
 	if errors.Is(err, errCancelled) {
 		fmt.Println("nothing written.")
 		return nil
@@ -52,12 +60,16 @@ func cmdAdd(args []string) error {
 
 // addDrill interviews for one drill and appends it to path. The deck is only
 // read from, to keep the new id unique against everything already loaded.
-func addDrill(in io.Reader, out io.Writer, deck *drill.Set, path string) error {
+func addDrill(in io.Reader, out io.Writer, deck *drill.Set, path string, pre problemPrefill) error {
 	sc := bufio.NewScanner(in)
 	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	a := &asker{sc: sc, out: out}
 
-	fmt.Fprintf(out, "new drill, appending to %s\n(blank line accepts the [default]; ctrl-d cancels)\n\n", path)
+	fmt.Fprintf(out, "new drill, appending to %s\n(blank line accepts the [default]; ctrl-d cancels)\n", path)
+	if pre.Ref != "" {
+		fmt.Fprintf(out, "for %s%s\n", pre.Ref, pre.covers())
+	}
+	fmt.Fprintln(out)
 
 	d := drill.Drill{}
 	kind, err := a.choose("kind", []string{"recall", "choice", "complexity", "snippet"}, "recall")
@@ -65,10 +77,10 @@ func addDrill(in io.Reader, out io.Writer, deck *drill.Set, path string) error {
 		return err
 	}
 	d.Kind = drill.Kind(kind)
-	if d.Title, err = a.required("title"); err != nil {
+	if d.Title, err = a.requiredOr("title", pre.Title); err != nil {
 		return err
 	}
-	if d.Topic, err = a.topic(deck); err != nil {
+	if d.Topic, err = a.topic(deck, pre.Topic); err != nil {
 		return err
 	}
 	diff, err := a.choose("difficulty", []string{"easy", "medium"}, "medium")
@@ -95,8 +107,17 @@ func addDrill(in io.Reader, out io.Writer, deck *drill.Set, path string) error {
 	if d.Hints, err = a.list("hint", 3); err != nil {
 		return err
 	}
-	if d.Refs, err = a.list("ref (e.g. LC 739)", 5); err != nil {
-		return err
+	if pre.Ref == "" {
+		if d.Refs, err = a.list("ref (e.g. LC 739)", 5); err != nil {
+			return err
+		}
+	} else {
+		fmt.Fprintf(out, "ref 1: %s\n", pre.Ref)
+		extra, err := a.list("extra ref", 4)
+		if err != nil {
+			return err
+		}
+		d.Refs = append([]string{pre.Ref}, extra...)
 	}
 	d.ID = uniqueID(slugify(d.Title), deck)
 	if d.ID, err = a.withDefault("id", d.ID); err != nil {
@@ -122,8 +143,105 @@ func addDrill(in io.Reader, out io.Writer, deck *drill.Set, path string) error {
 		return err
 	}
 	fmt.Fprintf(out, "added %s to %s\n", d.ID, path)
-	fmt.Fprintf(out, "try it: lcprac drill -topic %s\n", d.Topic)
+	if n := problemNumber(pre.Ref); n != "" {
+		fmt.Fprintf(out, "try it: lcprac drill -problem %s\n", n)
+	} else {
+		fmt.Fprintf(out, "try it: lcprac drill -topic %s\n", d.Topic)
+	}
 	return nil
+}
+
+// problemPrefill is what -problem contributes to the interview: the ref the
+// new drill carries, plus defaults read off the ref and the drills already
+// behind it.
+type problemPrefill struct {
+	Ref     string
+	Topic   string
+	Title   string
+	Covered bool
+}
+
+func (p problemPrefill) covers() string {
+	if p.Covered {
+		return ""
+	}
+	return " (nothing in the deck covers it yet)"
+}
+
+// prefillFor resolves a -problem query against the deck's refs and your
+// attempt log, so a gap you logged with `attempt -new` can be turned into a
+// drill by number. Nothing matching is not an error, unlike drill -problem:
+// covering a problem the deck has never heard of is the point.
+func prefillFor(set *drill.Set, store *progress.Store, query string) (problemPrefill, error) {
+	// matchesProblem drops a leading "lc", so a bare "lc" would match nothing
+	// and then be normalised into a ref named "lc".
+	if strings.TrimSpace(strings.TrimPrefix(strings.ToLower(strings.TrimSpace(query)), "lc")) == "" {
+		return problemPrefill{}, fmt.Errorf("name the problem, e.g. `lcprac add -problem 261`")
+	}
+	seen := map[string]bool{}
+	var refs []string
+	collect := func(ref string) {
+		ref = strings.TrimSpace(ref)
+		if ref == "" || seen[ref] || !matchesProblem(ref, query) {
+			return
+		}
+		seen[ref] = true
+		refs = append(refs, ref)
+	}
+	for _, d := range set.All() {
+		for _, ref := range d.Refs {
+			collect(ref)
+		}
+	}
+	for _, a := range store.Attempts() {
+		collect(a.Ref)
+	}
+	sort.Strings(refs)
+	if len(refs) > 1 {
+		return problemPrefill{}, fmt.Errorf("%q matches %d problems (%s); be more specific", query, len(refs), strings.Join(refs, "; "))
+	}
+	pre := problemPrefill{Ref: normalizeRef(query)}
+	if len(refs) == 1 {
+		pre.Ref = refs[0]
+	}
+	if pre.Ref == "" {
+		return problemPrefill{}, fmt.Errorf("name the problem, e.g. `lcprac add -problem 261`")
+	}
+	pre.Title = refTitle(pre.Ref)
+	pre.Topic, pre.Covered = refTopic(set, pre.Ref)
+	return pre, nil
+}
+
+// refTitle drops the "LC <n>" head so the title prompt can default to the
+// problem's own name.
+func refTitle(ref string) string {
+	fields := strings.Fields(ref)
+	if len(fields) > 2 && strings.EqualFold(fields[0], "lc") {
+		if _, err := strconv.Atoi(fields[1]); err == nil {
+			return strings.Join(fields[2:], " ")
+		}
+	}
+	return ref
+}
+
+// refTopic names the topic most of the problem's existing drills sit in, and
+// reports whether the deck covers the problem at all.
+func refTopic(set *drill.Set, ref string) (string, bool) {
+	counts := map[string]int{}
+	for _, d := range set.All() {
+		for _, r := range d.Refs {
+			if strings.EqualFold(strings.TrimSpace(r), ref) {
+				counts[d.Topic]++
+			}
+		}
+	}
+	best, n := "", 0
+	for t, c := range counts {
+		if c > n || (c == n && t < best) {
+			best, n = t, c
+		}
+	}
+	return best, best != ""
 }
 
 // appendDrill adds d to the JSON array at path, creating the file if needed.
@@ -207,6 +325,15 @@ func (a *asker) line(prompt string) (string, error) {
 	return strings.TrimSpace(a.sc.Text()), nil
 }
 
+// requiredOr takes a default when one is known, so -problem can fill the
+// title in without losing the "cannot be empty" rule when it cannot.
+func (a *asker) requiredOr(label, def string) (string, error) {
+	if def == "" {
+		return a.required(label)
+	}
+	return a.withDefault(label, def)
+}
+
 func (a *asker) required(label string) (string, error) {
 	for {
 		s, err := a.line(label + ": ")
@@ -242,9 +369,9 @@ func (a *asker) choose(label string, options []string, def string) (string, erro
 
 // topic offers the deck's existing topics so drills keep clustering into the
 // same buckets instead of splintering into near-duplicates.
-func (a *asker) topic(deck *drill.Set) (string, error) {
+func (a *asker) topic(deck *drill.Set, def string) (string, error) {
 	fmt.Fprintf(a.out, "existing topics: %s\n", strings.Join(deck.Topics(), ", "))
-	return a.required("topic")
+	return a.requiredOr("topic", def)
 }
 
 func (a *asker) minutes() (int, error) {

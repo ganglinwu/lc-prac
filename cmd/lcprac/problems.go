@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -198,7 +199,7 @@ func writeProblems(w io.Writer, rows []problemRow, n int) {
 		if gaps == 1 {
 			verb = "has"
 		}
-		fmt.Fprintf(w, "%d of them %s no drill behind it yet (`lcprac add` to write one).\n", gaps, verb)
+		fmt.Fprintf(w, "%d of them %s no drill behind it yet (`lcprac add -problem <n>` to write one).\n", gaps, verb)
 	}
 	if len(shown) > 0 {
 		fmt.Fprint(w, nextUp(shown[0]))
@@ -229,9 +230,18 @@ const staleAfter = 60 * 24 * time.Hour
 // its drills, or write one when the problem has none.
 func nextUp(top problemRow) string {
 	if top.Drills == 0 {
-		return fmt.Sprintf("next up: `lcprac add` a drill for %s, nothing in the deck covers it.\n", top.Ref)
+		return fmt.Sprintf("next up: `lcprac add -problem %s` a drill for %s, nothing in the deck covers it.\n", coverFlag(top), top.Ref)
 	}
 	return fmt.Sprintf("next up: attempt %s for real, or `lcprac drill %s` to warm up first.\n", top.Ref, warmUpFlag(top))
+}
+
+// coverFlag is what to pass `add -problem`: the number when the ref carries
+// one, otherwise the whole quoted name.
+func coverFlag(p problemRow) string {
+	if n := problemNumber(p.Ref); n != "" {
+		return n
+	}
+	return strconv.Quote(p.Ref)
 }
 
 // uncoveredCount is how many problems you have attempted for real that no
