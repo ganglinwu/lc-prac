@@ -27,6 +27,7 @@ go run ./cmd/lcprac list                 # every drill, no session
 go run ./cmd/lcprac topics               # topics and their drill counts
 go run ./cmd/lcprac stats                # accuracy, streak, recent sessions, what is due
 go run ./cmd/lcprac review               # reread the drills that keep beating you
+go run ./cmd/lcprac pace                 # how long drills take you vs their estimate
 go run ./cmd/lcprac note <id> <words>    # keep your own wording on a drill
 go run ./cmd/lcprac add                  # write a drill of your own, one prompt at a time
 go run ./cmd/lcprac mine                 # your own drills and where they live
@@ -161,6 +162,27 @@ lcprac note twoptr-sorted-pair -clear  # or -clear before the id
 A note is shown after the answer when the drill comes back in a session, and in
 `lcprac review`. Writing one on a drill you have never done does not mark it as
 practised or bring it forward in the schedule.
+
+## Pace
+
+Accuracy says whether you know a pattern. Pace says whether you can produce it
+inside an interview's clock, so every graded drill's time is saved with its
+grade and `lcprac pace` reads it back against the drill's estimate:
+
+```
+lcprac pace                   # the 8 slowest against their estimate
+lcprac pace -all              # every timed drill
+lcprac pace -topic dp         # only one topic
+lcprac pace -n 3              # a shorter list
+```
+
+The totals line always covers every timed drill, not just the rows shown, and
+ends with how many of them fit a 12 minute sitting at your current pace. During
+a session you also get a nudge on the spot when a drill runs past twice its
+estimate. `lcprac stats` names the single worst offender and points here.
+
+Time is only recorded for drills you actually answered: a skipped drill and a
+note-only drill both stay untimed.
 
 ## Drill kinds
 

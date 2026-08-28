@@ -34,6 +34,18 @@ type Record struct {
 	// Note is your own words on this drill, kept next to the history so the
 	// thing that made it click comes back with the drill.
 	Note string `json:"note,omitempty"`
+	// Seconds is the total time spent on this drill across every attempt,
+	// which is what makes pacing (not just accuracy) reviewable.
+	Seconds int `json:"seconds,omitempty"`
+}
+
+// AvgSeconds is how long an attempt at this drill takes on average, rounded
+// to the nearest second. Zero when nothing has been timed.
+func (r Record) AvgSeconds() int {
+	if r.Seen == 0 || r.Seconds == 0 {
+		return 0
+	}
+	return (r.Seconds + r.Seen/2) / r.Seen
 }
 
 // intervals is a Leitner ladder indexed by streak. A miss drops you to 0, so
@@ -222,6 +234,30 @@ func (s *Store) RecordOutcome(id string, o Outcome, now time.Time) Record {
 	r.DueAt = now.Add(interval(r.Streak))
 	s.records[id] = r
 	return r
+}
+
+// AddTime folds the time one attempt took into the drill's history. It only
+// touches a drill that has actually been attempted, so a note-only record
+// cannot pick up a duration and read as practice.
+func (s *Store) AddTime(id string, d time.Duration) {
+	r, ok := s.records[id]
+	if !ok || r.Seen == 0 || d <= 0 {
+		return
+	}
+	r.Seconds += int(d.Round(time.Second) / time.Second)
+	s.records[id] = r
+}
+
+// Timed returns every record that has time recorded against it, ordered by
+// drill id.
+func (s *Store) Timed() []Record {
+	var out []Record
+	for _, r := range s.Records() {
+		if r.Seconds > 0 && r.Seen > 0 {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 // Priority scores a drill for selection; higher is picked sooner. Overdue

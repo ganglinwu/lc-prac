@@ -346,3 +346,70 @@ func TestSetNoteKeepsHistoryAndClears(t *testing.T) {
 		t.Fatalf("Noted = %+v, want none", n)
 	}
 }
+
+func TestAddTimeAccumulatesAndAverages(t *testing.T) {
+	s := New("")
+	now := time.Now()
+	s.Record("a", true, now)
+	s.AddTime("a", 90*time.Second)
+	s.Record("a", false, now)
+	s.AddTime("a", 30*time.Second)
+
+	r, _ := s.Get("a")
+	if r.Seconds != 120 {
+		t.Fatalf("Seconds = %d, want 120", r.Seconds)
+	}
+	if got := r.AvgSeconds(); got != 60 {
+		t.Errorf("AvgSeconds = %d, want 60", got)
+	}
+}
+
+func TestAddTimeIgnoresUnattemptedAndZero(t *testing.T) {
+	s := New("")
+	s.AddTime("never-seen", time.Minute)
+	if _, ok := s.Get("never-seen"); ok {
+		t.Error("AddTime created a record for a drill with no attempt")
+	}
+	s.SetNote("noted", "my words")
+	s.AddTime("noted", time.Minute)
+	if r, _ := s.Get("noted"); r.Seconds != 0 {
+		t.Errorf("a note-only record picked up %ds", r.Seconds)
+	}
+	s.Record("a", true, time.Now())
+	s.AddTime("a", 0)
+	if r, _ := s.Get("a"); r.Seconds != 0 {
+		t.Errorf("a zero duration recorded %ds", r.Seconds)
+	}
+}
+
+func TestTimedListsOnlyTimedRecords(t *testing.T) {
+	s := New("")
+	now := time.Now()
+	s.Record("a", true, now)
+	s.AddTime("a", time.Minute)
+	s.Record("b", true, now)
+	s.SetNote("c", "words")
+
+	timed := s.Timed()
+	if len(timed) != 1 || timed[0].DrillID != "a" {
+		t.Fatalf("Timed() = %+v, want only a", timed)
+	}
+}
+
+func TestSecondsSurviveSaveAndLoad(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "progress.json")
+	s := New(path)
+	s.Record("a", true, time.Now())
+	s.AddTime("a", 3*time.Minute)
+	if err := s.Save(); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r, _ := loaded.Get("a"); r.Seconds != 180 {
+		t.Errorf("Seconds after reload = %d, want 180", r.Seconds)
+	}
+}

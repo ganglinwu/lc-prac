@@ -48,6 +48,7 @@ func (l *liveProgress) record(res runner.Result) {
 		return
 	}
 	l.store.RecordOutcome(res.Drill.ID, outcome(res), l.now())
+	l.store.AddTime(res.Drill.ID, res.Elapsed)
 	l.recorded++
 	switch {
 	case !res.Correct:

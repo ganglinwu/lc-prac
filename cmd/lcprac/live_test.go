@@ -140,3 +140,25 @@ func TestSaveResultsSkipsEmptySitting(t *testing.T) {
 		t.Errorf("unexpected output: %s", out)
 	}
 }
+
+// Pace is only reviewable if the per-drill time lands on disk with the grade.
+func TestLiveRecordSavesElapsed(t *testing.T) {
+	live, _, path := testLive(t)
+	res := result("a", true, 0, false)
+	res.Elapsed = 95 * time.Second
+	live.record(res)
+	skipped := result("b", false, 0, true)
+	skipped.Elapsed = time.Minute
+	live.record(skipped)
+
+	reloaded, err := progress.Load(path)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if rec, _ := reloaded.Get("a"); rec.Seconds != 95 {
+		t.Errorf("Seconds = %d, want 95", rec.Seconds)
+	}
+	if _, ok := reloaded.Get("b"); ok {
+		t.Error("a skipped drill was timed; it was never attempted")
+	}
+}

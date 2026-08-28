@@ -45,6 +45,8 @@ func run(args []string) error {
 		return cmdReview(args)
 	case "note":
 		return cmdNote(args)
+	case "pace":
+		return cmdPace(args)
 	case "help", "-h", "--help":
 		usage()
 		return nil
@@ -74,6 +76,9 @@ func usage() {
   lcprac review [-n 5] [-topic X] [-all] [id...]
       Reread the drills you keep missing, answers shown. Name ids to read
       those instead; -all widens it to everything you have ever missed.
+  lcprac pace [-n 8] [-topic X] [-all]
+      Show how long drills actually take you against their estimate, slowest
+      first, plus how many fit a 12 minute sitting.
   lcprac note [id] [your words] [-clear]
       Keep your own wording on a drill. It is shown when the drill comes back
       and in review. With no id it lists every note you have written.
@@ -343,6 +348,10 @@ func cmdStats(args []string) error {
 	}
 	if n := len(store.Leeches()); n > 0 {
 		fmt.Printf("%d drill(s) keep beating you: lcprac review, or lcprac drill -leech\n", n)
+	}
+	if rows := paceRows(set, store, ""); len(rows) > 0 && rows[0].Over() > 0 {
+		fmt.Printf("slowest against its estimate: %s (%s vs %s): lcprac pace\n",
+			rows[0].Drill.Title, short(rows[0].Avg), short(rows[0].Est))
 	}
 	if next := focus(stats); next != "" {
 		fmt.Printf("next up: lcprac drill -weak  (that is %s right now)\n", next)
