@@ -25,6 +25,7 @@ go run ./cmd/lcprac list                 # every drill, no session
 go run ./cmd/lcprac topics               # topics and their drill counts
 go run ./cmd/lcprac stats                # accuracy, streak, recent sessions, what is due
 go run ./cmd/lcprac review               # reread the drills that keep beating you
+go run ./cmd/lcprac add                  # write a drill of your own, one prompt at a time
 go run ./cmd/lcprac mine                 # your own drills and where they live
 ```
 
@@ -199,9 +200,24 @@ You do not need to rebuild to add a drill. Any `*.json` file in your drills
 directory is loaded on top of the builtin deck:
 
 ```
+lcprac add           # answer a few prompts, drill lands in mine.json
 lcprac mine          # show the directory and what it currently adds
 lcprac mine -init    # write an example.json there to copy
 ```
+
+`add` is the fast path: it asks for kind, title, topic, difficulty, prompt,
+answer, explanation, minutes, and optional hints and refs, then shows the drill
+the way `review` would before writing it. A choice drill collects its options
+and takes the answer by number, so the answer always matches one of them. The
+id is slugged from the title (`mine-...`) and suffixed if it is already taken,
+though you can type your own; reusing a builtin id is allowed and says so,
+since that is how you replace a drill.
+
+Bad input re-asks rather than aborting, Ctrl-D or answering `n` at the
+confirmation writes nothing, and the append goes through a temp file so a
+failure cannot truncate what you already wrote. `-file other.json` appends
+somewhere else in the same directory. Long or multi-line prompts are easier to
+paste into the file afterwards: everything `add` writes is ordinary JSON.
 
 The directory is `$LCPRAC_HOME/drills`, else `$XDG_DATA_HOME/lcprac/drills`,
 else `~/.local/share/lcprac/drills`. The file format is the same array of

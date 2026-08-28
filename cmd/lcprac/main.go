@@ -39,6 +39,8 @@ func run(args []string) error {
 		return cmdStats(args)
 	case "mine":
 		return cmdMine(args)
+	case "add":
+		return cmdAdd(args)
 	case "review":
 		return cmdReview(args)
 	case "help", "-h", "--help":
@@ -68,6 +70,9 @@ func usage() {
   lcprac review [-n 5] [-topic X] [-all] [id...]
       Reread the drills you keep missing, answers shown. Name ids to read
       those instead; -all widens it to everything you have ever missed.
+  lcprac add [-file mine.json]
+      Write a new drill of your own by answering a few prompts. It is appended
+      to a file in your drills directory and is in the deck immediately.
   lcprac mine [-init]
       Show where your own drill files live and what they add. -init writes a
       commented example you can copy.
