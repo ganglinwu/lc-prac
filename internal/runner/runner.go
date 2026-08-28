@@ -155,7 +155,7 @@ func (r *Runner) Run(s session.Session) (Report, error) {
 			fmt.Fprintf(r.out, "\ntime is up (%s). %d left for next time.\n", budget.Round(time.Second), len(rep.Unasked))
 			break
 		}
-		res, err := r.runOne(fmt.Sprintf("%d/%d", i+1, len(s.Drills)), d)
+		res, err := r.runOne(fmt.Sprintf("%d/%d", i+1, len(s.Drills)), d, deadline)
 		if err == io.EOF {
 			break
 		}
@@ -191,7 +191,7 @@ func (r *Runner) retryPass(rep *Report, deadline time.Time) error {
 			fmt.Fprintf(r.out, "\nout of time for the rest of the second pass.\n")
 			return nil
 		}
-		res, err := r.runOne(fmt.Sprintf("retry %d/%d", i+1, len(missed)), d)
+		res, err := r.runOne(fmt.Sprintf("retry %d/%d", i+1, len(missed)), d, deadline)
 		if err == io.EOF {
 			return nil
 		}
@@ -203,7 +203,9 @@ func (r *Runner) retryPass(rep *Report, deadline time.Time) error {
 	return nil
 }
 
-func (r *Runner) runOne(label string, d drill.Drill) (Result, error) {
+// deadline bounds the drill's own retry loop (zero means no clock); the drill
+// in progress is never cut off mid-answer.
+func (r *Runner) runOne(label string, d drill.Drill, deadline time.Time) (Result, error) {
 	started := r.Now()
 	fmt.Fprintf(r.out, "\n[%s] %s  (%s, %s, ~%dm)\n", label, d.Title, d.Topic, d.Difficulty, d.EstMinutes)
 	fmt.Fprintf(r.out, "\n%s\n", d.Prompt)
@@ -239,7 +241,7 @@ func (r *Runner) runOne(label string, d drill.Drill) (Result, error) {
 	}
 
 	if machineGraded {
-		out, err := r.gradeCode(d, input)
+		out, err := r.gradeCode(d, input, deadline)
 		if err != nil {
 			return Result{}, err
 		}
@@ -339,8 +341,8 @@ func (r *Runner) codeAttempts() int {
 // a missing return or a typo is worth fixing yourself, and reading the failing
 // test output is most of the value. first is the line already consumed by
 // runOne. The working version is shown once the tries run out or the user
-// asks for it.
-func (r *Runner) gradeCode(d drill.Drill, first string) (codeOutcome, error) {
+// asks for it, or the session clock runs out mid-drill.
+func (r *Runner) gradeCode(d drill.Drill, first string, deadline time.Time) (codeOutcome, error) {
 	var out codeOutcome
 	max := r.codeAttempts()
 	seed := d.Code.Stub
@@ -378,6 +380,13 @@ func (r *Runner) gradeCode(d drill.Drill, first string) (codeOutcome, error) {
 		fmt.Fprintf(r.out, "\ntests failed:\n%s\n", res.Output)
 		if out.attempts >= max {
 			fmt.Fprintf(r.out, "\nthat was try %d of %d.\n", out.attempts, max)
+			r.revealCode(d)
+			return out, nil
+		}
+		// Another try would run on borrowed time: the session clock already
+		// stopped, so offer the answer instead of a fourth compile.
+		if !deadline.IsZero() && !r.Now().Before(deadline) {
+			fmt.Fprintln(r.out, "\nout of time for another try.")
 			r.revealCode(d)
 			return out, nil
 		}

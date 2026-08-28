@@ -38,7 +38,9 @@ Ctrl-D quits early and still prints the summary.
 against. Before each drill lcprac checks how long you have actually taken, and
 once the budget is spent it stops and tells you what is left for next time. The
 check happens between drills, so a drill you are part way through is never cut
-off: a session overruns by at most the one in progress. The second pass gets a
+off: a session overruns by at most the one in progress. A code drill's fix-it
+loop is bounded by the same clock, so once the budget is spent it stops
+offering another try instead of stacking three compiles onto the overrun. The second pass gets a
 further quarter of the budget, enough for reinforcement without an open-ended
 overrun.
 
@@ -163,7 +165,8 @@ your last version, not the stub), so a missing return or an off-by-one costs
 you a try rather than the drill. Reading the failing test and repairing your
 own code is most of the value, which is why the working version is only shown
 once you give up or run out of tries. Three tries by default; `-tries N`
-changes it, and `h` still works at the retry prompt.
+changes it, and `h` still works at the retry prompt. The loop also stops early
+if the session clock runs out mid-drill, unless you passed `-nolimit`.
 
 Solving on the second or third try still counts as a solve and advances the
 repetition ladder: you got there yourself. The summary shows the try count next

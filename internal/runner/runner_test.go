@@ -585,3 +585,56 @@ func TestCodeDrillHintsWorkDuringRetry(t *testing.T) {
 		t.Errorf("a hinted solve should be marked ~, got:\n%s", out)
 	}
 }
+
+func TestCodeDrillStopsOfferingTriesWhenTimeIsUp(t *testing.T) {
+	grade, calls := failThenPass(99)
+	var out strings.Builder
+	r := New(strings.NewReader("func add(a, b int) int { return 0 }\n.\nr\n"), &out)
+	r.RetryMisses = false
+	r.Grade = grade
+	r.CodeAttempts = 3
+	now := time.Unix(0, 0)
+	r.Now = func() time.Time {
+		now = now.Add(time.Minute)
+		return now
+	}
+	// Start at 1m and the deadline lands at 3m, so the drill starts in time
+	// but the clock is spent by the time its first compile fails.
+	rep, err := r.Run(session.Session{Drills: []drill.Drill{codeDrill()}, BudgetMinutes: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *calls != 1 {
+		t.Fatalf("a spent budget should not buy another compile, got %d", *calls)
+	}
+	if !strings.Contains(out.String(), "out of time for another try") {
+		t.Errorf("the drill should say why it stopped:\n%s", out.String())
+	}
+	if n := strings.Count(out.String(), "working version"); n != 1 {
+		t.Errorf("the answer should still be revealed once, got %d", n)
+	}
+	if len(rep.Results) != 1 || rep.Results[0].Attempts != 1 {
+		t.Errorf("Attempts = %+v, want one attempt recorded", rep.Results)
+	}
+}
+
+func TestCodeDrillKeepsItsTriesWithoutATimeLimit(t *testing.T) {
+	grade, calls := failThenPass(99)
+	var out strings.Builder
+	r := New(strings.NewReader("a\n.\nr\nb\n.\n"), &out)
+	r.RetryMisses = false
+	r.Grade = grade
+	r.CodeAttempts = 2
+	r.NoTimeLimit = true
+	now := time.Unix(0, 0)
+	r.Now = func() time.Time {
+		now = now.Add(time.Hour)
+		return now
+	}
+	if _, err := r.Run(session.Session{Drills: []drill.Drill{codeDrill()}, BudgetMinutes: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if *calls != 2 {
+		t.Fatalf("-nolimit should keep every try, got %d compiles", *calls)
+	}
+}
