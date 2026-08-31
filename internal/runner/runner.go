@@ -220,7 +220,7 @@ func (r *Runner) retryPass(rep *Report, deadline time.Time) error {
 // in progress is never cut off mid-answer.
 func (r *Runner) runOne(label string, d drill.Drill, deadline time.Time) (Result, error) {
 	started := r.Now()
-	fmt.Fprintf(r.out, "\n[%s] %s  (%s, %s, ~%dm)\n", label, d.Title, d.Topic, d.Difficulty, d.EstMinutes)
+	fmt.Fprintf(r.out, "[%s] \nID:[%s] \n%s  (%s, %s, ~%dm)\n", label, d.ID, d.Title, d.Topic, d.Difficulty, d.EstMinutes)
 	fmt.Fprintf(r.out, "\n%s\n", d.Prompt)
 	for i, c := range d.Choices {
 		fmt.Fprintf(r.out, "  %d) %s\n", i+1, c)
@@ -527,7 +527,7 @@ func (r *Runner) printSummary(rep Report) {
 		if res.Attempts > 1 {
 			tries = fmt.Sprintf(" %d tries", res.Attempts)
 		}
-		fmt.Fprintf(r.out, "  %s %s (%s) %s%s\n", mark, res.Drill.Title, res.Drill.Topic, res.Elapsed.Round(time.Second), tries)
+		fmt.Fprintf(r.out, "  ID:%s\n  %s %s (%s) %s%s\n", res.Drill.ID, mark, res.Drill.Title, res.Drill.Topic, res.Elapsed.Round(time.Second), tries)
 	}
 	for _, d := range rep.Unasked {
 		fmt.Fprintf(r.out, "  . %s (%s) not reached\n", d.Title, d.Topic)
