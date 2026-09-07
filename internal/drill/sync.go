@@ -81,12 +81,18 @@ func laterDrill(a, b Drill) Drill {
 }
 
 // editedAt treats an unstamped drill as the oldest possible, so a drill
-// written before stamping existed loses to any edited copy of it.
+// written before stamping existed loses to any edited copy of it. A deletion
+// counts as an edit, which is what lets a tombstone beat the live copy still
+// sitting on your other machine, and lets rewriting the drill undo it.
 func editedAt(d Drill) time.Time {
-	if d.UpdatedAt == nil {
-		return time.Time{}
+	t := time.Time{}
+	if d.UpdatedAt != nil {
+		t = d.UpdatedAt.UTC()
 	}
-	return d.UpdatedAt.UTC()
+	if d.DeletedAt != nil && d.DeletedAt.UTC().After(t) {
+		t = d.DeletedAt.UTC()
+	}
+	return t
 }
 
 // canonical is the drill's JSON, used only to break a timestamp tie.
@@ -102,10 +108,23 @@ func canonical(d Drill) string {
 // ignores Source, which the loader fills in from where the file was, and
 // compares timestamps by instant rather than by wall clock and location.
 func SameDrill(a, b Drill) bool {
-	if !editedAt(a).Equal(editedAt(b)) {
+	if !editedAt(a).Equal(editedAt(b)) || a.Deleted() != b.Deleted() {
 		return false
 	}
 	a.UpdatedAt, b.UpdatedAt = nil, nil
+	a.DeletedAt, b.DeletedAt = nil, nil
 	a.Source, b.Source = "", ""
 	return canonical(a) == canonical(b)
+}
+
+// LiveDrills drops the tombstones, which is every use of a drill set other
+// than syncing it.
+func LiveDrills(ds []Drill) []Drill {
+	var out []Drill
+	for _, d := range ds {
+		if !d.Deleted() {
+			out = append(out, d)
+		}
+	}
+	return out
 }

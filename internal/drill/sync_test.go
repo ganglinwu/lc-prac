@@ -147,7 +147,7 @@ func TestApplyMergedUpdatesInPlaceAndFilesNewcomers(t *testing.T) {
 		mkDrill("edited", "new text", at("2026-02-01T00:00:00Z")),
 		mkDrill("kept", "unchanged", at("2026-01-01T00:00:00Z")),
 	}
-	added, updated, err := ApplyMerged(dir, merged)
+	added, updated, _, err := ApplyMerged(dir, merged)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,7 +196,7 @@ func TestApplyMergedNoChangeLeavesFilesAlone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	added, updated, err := ApplyMerged(dir, ds)
+	added, updated, _, err := ApplyMerged(dir, ds)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +217,7 @@ func TestApplyMergedNoChangeLeavesFilesAlone(t *testing.T) {
 
 func TestApplyMergedIntoEmptyDir(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "drills")
-	added, updated, err := ApplyMerged(dir, []Drill{mkDrill("a", "p", nil)})
+	added, updated, _, err := ApplyMerged(dir, []Drill{mkDrill("a", "p", nil)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,5 +227,158 @@ func TestApplyMergedIntoEmptyDir(t *testing.T) {
 	got, err := LoadUserDir(dir)
 	if err != nil || len(got) != 1 {
 		t.Fatalf("loading a fresh dir gave %v, %v", got, err)
+	}
+}
+
+func tombstone(id string, at *time.Time) Drill {
+	return Drill{ID: id, DeletedAt: at}
+}
+
+func TestTombstoneValidatesOnIDAlone(t *testing.T) {
+	if err := tombstone("gone", at("2026-01-01T00:00:00Z")).Validate(); err != nil {
+		t.Fatalf("tombstone rejected: %v", err)
+	}
+	if err := (Drill{DeletedAt: at("2026-01-01T00:00:00Z")}).Validate(); err == nil {
+		t.Fatal("tombstone without an id was accepted")
+	}
+}
+
+func TestDecodeDrillsAcceptsTombstones(t *testing.T) {
+	in := []Drill{mkDrill("a", "p", at("2026-01-01T00:00:00Z")), tombstone("b", at("2026-02-01T00:00:00Z"))}
+	b, err := EncodeDrills(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := DecodeDrills(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out) != 2 || !out[1].Deleted() {
+		t.Fatalf("decoded %+v, want the tombstone to survive the round trip", out)
+	}
+}
+
+func TestMergeDrillsLetsALaterDeleteWin(t *testing.T) {
+	live := []Drill{mkDrill("a", "p", at("2026-01-01T00:00:00Z"))}
+	dead := []Drill{tombstone("a", at("2026-02-01T00:00:00Z"))}
+	for _, m := range [][]Drill{MergeDrills(live, dead), MergeDrills(dead, live)} {
+		if len(m) != 1 || !m[0].Deleted() {
+			t.Fatalf("merged = %+v, want the delete to win from either side", m)
+		}
+	}
+	if got := LiveDrills(MergeDrills(live, dead)); len(got) != 0 {
+		t.Fatalf("deck still has %d drills after a delete", len(got))
+	}
+}
+
+func TestMergeDrillsLetsALaterRewriteUndoADelete(t *testing.T) {
+	dead := []Drill{tombstone("a", at("2026-02-01T00:00:00Z"))}
+	rewritten := []Drill{mkDrill("a", "written again", at("2026-03-01T00:00:00Z"))}
+	m := MergeDrills(dead, rewritten)
+	if len(m) != 1 || m[0].Deleted() || m[0].Prompt != "written again" {
+		t.Fatalf("merged = %+v, want the rewrite to win", m)
+	}
+}
+
+func TestDeleteDrillTombstonesEveryCopy(t *testing.T) {
+	dir := t.TempDir()
+	writeJSONFile(t, filepath.Join(dir, "a.json"), []Drill{
+		mkDrill("doomed", "p", at("2026-01-01T00:00:00Z")),
+		mkDrill("kept", "p", at("2026-01-01T00:00:00Z")),
+	})
+	writeJSONFile(t, filepath.Join(dir, "b.json"), []Drill{mkDrill("doomed", "p", at("2026-01-01T00:00:00Z"))})
+
+	when := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
+	files, found, err := DeleteDrill(dir, "doomed", when)
+	if err != nil || !found || files != 2 {
+		t.Fatalf("DeleteDrill = %d, %v, %v; want 2, true, nil", files, found, err)
+	}
+	live, err := LoadUserDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(live) != 1 || live[0].ID != "kept" {
+		t.Fatalf("deck = %+v, want only the kept drill", live)
+	}
+	all, err := LoadUserDirAll(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stones := 0
+	for _, d := range all {
+		if d.Deleted() && d.ID == "doomed" {
+			stones++
+			if d.Prompt != "" || d.Title != "" {
+				t.Errorf("tombstone still carries content: %+v", d)
+			}
+			if !d.DeletedAt.Equal(when) {
+				t.Errorf("tombstone stamped %v, want %v", d.DeletedAt, when)
+			}
+		}
+	}
+	if stones != 2 {
+		t.Fatalf("%d tombstones on disk, want 2", stones)
+	}
+	if _, found, err := DeleteDrill(dir, "doomed", when); err != nil || found {
+		t.Fatalf("second delete = %v, %v; want not found", found, err)
+	}
+	if _, found, err := DeleteDrill(dir, "never-existed", when); err != nil || found {
+		t.Fatalf("delete of an unknown id = %v, %v; want not found", found, err)
+	}
+}
+
+func TestApplyMergedRecordsADeleteAndIgnoresAnUnknownOne(t *testing.T) {
+	dir := t.TempDir()
+	mine := filepath.Join(dir, "mine.json")
+	writeJSONFile(t, mine, []Drill{
+		mkDrill("doomed", "p", at("2026-01-01T00:00:00Z")),
+		mkDrill("kept", "p", at("2026-01-01T00:00:00Z")),
+	})
+	merged := []Drill{
+		mkDrill("kept", "p", at("2026-01-01T00:00:00Z")),
+		tombstone("doomed", at("2026-02-01T00:00:00Z")),
+		tombstone("someone-elses", at("2026-02-01T00:00:00Z")),
+	}
+	added, updated, deleted, err := ApplyMerged(dir, merged)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if added != 0 || updated != 0 || deleted != 1 {
+		t.Fatalf("added=%d updated=%d deleted=%d, want 0/0/1", added, updated, deleted)
+	}
+	// A tombstone for a drill this machine never had is not worth a file: it
+	// has no local copy to hold down.
+	if _, err := os.Stat(filepath.Join(dir, SyncedFile)); !os.IsNotExist(err) {
+		t.Fatalf("synced.json exists after an unknown tombstone: %v", err)
+	}
+	live, err := LoadUserDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(live) != 1 || live[0].ID != "kept" {
+		t.Fatalf("deck = %+v, want only the kept drill", live)
+	}
+	// Re-applying the same merge must not report the delete a second time.
+	if _, _, deleted, err := ApplyMerged(dir, merged); err != nil || deleted != 0 {
+		t.Fatalf("second apply deleted=%d err=%v, want 0 and nil", deleted, err)
+	}
+}
+
+// A tombstone on the wire should be an id and a time, not a drill with every
+// field blanked out.
+func TestTombstoneEncodesWithoutEmptyFields(t *testing.T) {
+	b, err := EncodeDrills([]Drill{tombstone("gone", at("2026-02-01T00:00:00Z"))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw []map[string]any
+	if err := json.Unmarshal(b, &raw); err != nil {
+		t.Fatal(err)
+	}
+	if len(raw) != 1 || len(raw[0]) != 2 {
+		t.Fatalf("tombstone encoded as %s, want only id and deleted_at", b)
+	}
+	if raw[0]["id"] != "gone" || raw[0]["deleted_at"] == nil {
+		t.Fatalf("tombstone encoded as %s", b)
 	}
 }

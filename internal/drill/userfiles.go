@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"time"
 )
 
 // SyncedFile is where drills pulled from another machine land when this
@@ -14,10 +15,10 @@ const SyncedFile = "synced.json"
 // ApplyMerged rewrites the drill files in dir so they hold merged. A drill
 // this machine already has is updated where it lives, so a file you organised
 // by hand stays organised; anything new goes into SyncedFile.
-func ApplyMerged(dir string, merged []Drill) (added, updated int, err error) {
+func ApplyMerged(dir string, merged []Drill) (added, updated, deleted int, err error) {
 	files, err := readUserFiles(dir)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	homes := map[string][]place{}
 	for _, f := range files {
@@ -30,26 +31,34 @@ func ApplyMerged(dir string, merged []Drill) (added, updated int, err error) {
 	for _, m := range merged {
 		spots, ok := homes[m.ID]
 		if !ok {
-			newcomers = append(newcomers, m)
+			// A tombstone for a drill this machine never had is nothing to
+			// record: there is no local copy for it to protect.
+			if !m.Deleted() {
+				newcomers = append(newcomers, m)
+			}
 			continue
 		}
-		changed := false
+		changed, gone := false, false
 		for _, p := range spots {
 			if SameDrill(p.file.drills[p.index], m) {
 				continue
 			}
+			gone = gone || (m.Deleted() && !p.file.drills[p.index].Deleted())
 			p.file.drills[p.index] = m
 			dirty[p.file.path] = true
 			changed = true
 		}
-		if changed {
+		switch {
+		case gone:
+			deleted++
+		case changed:
 			updated++
 		}
 	}
 	for _, f := range files {
 		if dirty[f.path] {
 			if err := writeDrillFile(f.path, f.drills); err != nil {
-				return 0, 0, err
+				return 0, 0, 0, err
 			}
 		}
 	}
@@ -57,14 +66,43 @@ func ApplyMerged(dir string, merged []Drill) (added, updated int, err error) {
 		path := filepath.Join(dir, SyncedFile)
 		existing, err := readExisting(path)
 		if err != nil {
-			return 0, 0, err
+			return 0, 0, 0, err
 		}
 		if err := writeDrillFile(path, append(existing, newcomers...)); err != nil {
-			return 0, 0, err
+			return 0, 0, 0, err
 		}
 		added = len(newcomers)
 	}
-	return added, updated, nil
+	return added, updated, deleted, nil
+}
+
+// DeleteDrill replaces every copy of id in dir with a tombstone, so the drill
+// leaves this machine's deck and the deletion has something to travel as. It
+// reports how many files it rewrote, and false if the id was not yours.
+func DeleteDrill(dir, id string, at time.Time) (files int, found bool, err error) {
+	all, err := readUserFiles(dir)
+	if err != nil {
+		return 0, false, err
+	}
+	stone := Tombstone(id, at)
+	for _, f := range all {
+		hit := false
+		for i, d := range f.drills {
+			if d.ID != id || d.Deleted() {
+				continue
+			}
+			f.drills[i] = stone
+			hit = true
+		}
+		if !hit {
+			continue
+		}
+		if err := writeDrillFile(f.path, f.drills); err != nil {
+			return files, true, err
+		}
+		files++
+	}
+	return files, files > 0, nil
 }
 
 // place is one copy of a drill: which file holds it and where in that file. A

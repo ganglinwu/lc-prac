@@ -114,7 +114,7 @@ func doSync(w io.Writer, cfg synccli.Config, dry bool) error {
 	if err != nil {
 		return err
 	}
-	if delta.NewWritten, delta.UpdatedWritten, err = syncOwnDrills(client, !dry); err != nil {
+	if delta.NewWritten, delta.UpdatedWritten, delta.DeletedWritten, err = syncOwnDrills(client, !dry); err != nil {
 		return err
 	}
 	if !delta.Changed() {
@@ -138,12 +138,12 @@ func doSync(w io.Writer, cfg synccli.Config, dry bool) error {
 // syncOwnDrills carries the drills you wrote yourself. It is a second document
 // on the same server, so it needs its own round trip; apply is false for a dry
 // run, which counts what would arrive without writing any file.
-func syncOwnDrills(c *synccli.Client, apply bool) (int, int, error) {
+func syncOwnDrills(c *synccli.Client, apply bool) (int, int, int, error) {
 	dir, err := drill.UserDir()
 	if err != nil {
 		// No home directory means nowhere to keep your own drills, which is
 		// not a reason to fail a history sync that already worked.
-		return 0, 0, nil
+		return 0, 0, 0, nil
 	}
 	return synccli.SyncDrills(c, dir, apply)
 }
@@ -168,6 +168,9 @@ func printDelta(w io.Writer, d synccli.Delta) {
 	}
 	if d.UpdatedWritten > 0 {
 		fmt.Fprintf(w, "  %d drill(s) you edited on another machine\n", d.UpdatedWritten)
+	}
+	if d.DeletedWritten > 0 {
+		fmt.Fprintf(w, "  %d drill(s) you deleted on another machine\n", d.DeletedWritten)
 	}
 }
 
@@ -196,7 +199,7 @@ func autoSync(w io.Writer, quiet bool) {
 		fmt.Fprintln(os.Stderr, "lcprac: sync skipped:", err)
 		return
 	}
-	if delta.NewWritten, delta.UpdatedWritten, err = syncOwnDrills(client, true); err != nil {
+	if delta.NewWritten, delta.UpdatedWritten, delta.DeletedWritten, err = syncOwnDrills(client, true); err != nil {
 		// The history half already worked, so this is a warning rather than a
 		// reason to leave the merge unsaved.
 		fmt.Fprintln(os.Stderr, "lcprac: your own drills were not synced:", err)

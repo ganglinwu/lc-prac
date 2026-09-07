@@ -51,16 +51,19 @@ type CodeSpec struct {
 
 // Drill is a single practice unit.
 type Drill struct {
-	ID          string     `json:"id"`
-	Title       string     `json:"title"`
-	Kind        Kind       `json:"kind"`
-	Topic       string     `json:"topic"`
-	Difficulty  Difficulty `json:"difficulty"`
-	EstMinutes  int        `json:"est_minutes"`
-	Prompt      string     `json:"prompt"`
+	ID string `json:"id"`
+	// Everything below the id is omitempty so a tombstone writes as an id and
+	// a timestamp rather than as a drill with every field blanked. A live
+	// drill has to fill them all in anyway, so nothing real is dropped.
+	Title       string     `json:"title,omitempty"`
+	Kind        Kind       `json:"kind,omitempty"`
+	Topic       string     `json:"topic,omitempty"`
+	Difficulty  Difficulty `json:"difficulty,omitempty"`
+	EstMinutes  int        `json:"est_minutes,omitempty"`
+	Prompt      string     `json:"prompt,omitempty"`
 	Choices     []string   `json:"choices,omitempty"`
-	Answer      string     `json:"answer"`
-	Explanation string     `json:"explanation"`
+	Answer      string     `json:"answer,omitempty"`
+	Explanation string     `json:"explanation,omitempty"`
 	// Hints are progressive nudges, revealed one at a time on request. Each
 	// should narrow the search without naming the answer.
 	Hints []string  `json:"hints,omitempty"`
@@ -70,6 +73,11 @@ type Drill struct {
 	// copy is the later edit. Builtin drills leave it nil; so do drills you
 	// wrote before stamping existed, which makes them lose to any newer copy.
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
+	// DeletedAt turns the drill into a tombstone: the id stays so the deletion
+	// can travel to your other machines, but nothing practises it. Without
+	// this a delete would be undone by the next pull, since a merge that only
+	// unions can never learn that something went away.
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 	// Source is where the drill was loaded from, filled in by the loader
 	// rather than by the file itself.
 	Source string `json:"-"`
@@ -81,10 +89,25 @@ func (d Drill) SelfGraded() bool {
 	return d.Kind == KindRecall || d.Kind == KindSnippet
 }
 
-// Validate reports the first structural problem with a drill, if any.
+// Deleted reports whether the drill is a tombstone rather than something to
+// practise.
+func (d Drill) Deleted() bool { return d.DeletedAt != nil }
+
+// Tombstone is the deleted marker for an id, carrying no content: a deletion
+// should not keep shipping the text of what was deleted around.
+func Tombstone(id string, at time.Time) Drill {
+	at = at.UTC()
+	return Drill{ID: id, DeletedAt: &at}
+}
+
+// Validate reports the first structural problem with a drill, if any. A
+// tombstone is checked on its id alone, since the rest of it is gone.
 func (d Drill) Validate() error {
 	if strings.TrimSpace(d.ID) == "" {
 		return fmt.Errorf("drill: missing id")
+	}
+	if d.Deleted() {
+		return nil
 	}
 	if strings.TrimSpace(d.Title) == "" {
 		return fmt.Errorf("drill %s: missing title", d.ID)

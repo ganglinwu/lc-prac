@@ -388,6 +388,7 @@ lcprac add           # answer a few prompts, drill lands in mine.json
 lcprac add -problem 261  # the same, aimed at one real problem
 lcprac mine          # show the directory and what it currently adds
 lcprac mine -init    # write an example.json there to copy
+lcprac mine -rm ID   # delete one of your drills, here and on your other machines
 ```
 
 `add` is the fast path: it asks for kind, title, topic, difficulty, prompt,
@@ -482,6 +483,13 @@ machine land in `drills/synced.json`. Two caveats: a drill you edit by hand in a
 JSON file keeps its old `updated_at` and so loses to any stamped copy elsewhere,
 and only your own drills sync, since the builtin bank is compiled into the
 binary and travels by rebuilding it.
+
+Deleting one takes `lcprac mine -rm ID` rather than a text editor. A merge that
+only unions cannot notice a row that simply vanished, so a drill deleted by hand
+would be handed back on the next pull. `-rm` leaves a tombstone in its place, an
+id and a `deleted_at` and nothing else: the drill leaves your deck immediately
+and leaves your other machines' decks on their next sync. Writing the drill
+again later beats the tombstone, since the newer stamp wins as usual.
 
 The config lives in `sync.json` next to the history, mode 0600 because it holds
 the token. `LCPRAC_SYNC_URL` and `LCPRAC_SYNC_TOKEN` override it for a one-off.

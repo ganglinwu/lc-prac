@@ -3,9 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
+	"time"
 
 	"github.com/ganglinwu/lc-prac/internal/drill"
 )
@@ -43,6 +45,7 @@ const exampleFile = `[
 func cmdMine(args []string) error {
 	fs := flag.NewFlagSet("mine", flag.ContinueOnError)
 	init := fs.Bool("init", false, "write an example drill file if the directory has none")
+	rm := fs.String("rm", "", "delete one of your drills by id, on every machine")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -54,6 +57,9 @@ func cmdMine(args []string) error {
 		if err := writeExample(dir); err != nil {
 			return err
 		}
+	}
+	if *rm != "" {
+		return removeMine(os.Stdout, dir, *rm)
 	}
 
 	mine, err := drill.LoadUserDir(dir)
@@ -86,6 +92,32 @@ func cmdMine(args []string) error {
 		return err
 	}
 	fmt.Printf("\n%d added, %d replacing a builtin drill\n", added, replaced)
+	return nil
+}
+
+// removeMine turns one of your drills into a tombstone. The entry stays in
+// its file with only its id, because a merge that only unions cannot learn
+// about a row that simply vanished: the next sync would hand it back.
+func removeMine(w io.Writer, dir, id string) error {
+	files, found, err := drill.DeleteDrill(dir, id, time.Now())
+	if err != nil {
+		return err
+	}
+	if !found {
+		all, err := drill.LoadUserDirAll(dir)
+		if err != nil {
+			return err
+		}
+		for _, d := range all {
+			if d.ID == id {
+				fmt.Fprintf(w, "%s is already deleted.\n", id)
+				return nil
+			}
+		}
+		return fmt.Errorf("no drill of yours with id %q (builtin drills cannot be deleted)", id)
+	}
+	fmt.Fprintf(w, "deleted %s (%d file(s) rewritten).\n", id, files)
+	fmt.Fprintln(w, "run `lcprac sync` to remove it from your other machines.")
 	return nil
 }
 

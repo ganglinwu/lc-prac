@@ -121,9 +121,10 @@ func usage() {
       second time. -n shows what would come back without writing it. Drill
       sessions sync on their own once a server is set; -auto off stops that
       and leaves sync to this command.
-  lcprac mine [-init]
+  lcprac mine [-init] [-rm ID]
       Show where your own drill files live and what they add. -init writes a
-      commented example you can copy.
+      commented example you can copy. -rm deletes one of your drills by id and
+      makes the next sync delete it on your other machines too.
 
   your own drills are any *.json files in that directory, in the same shape as
   the builtin deck. They are added to the deck automatically; one that reuses a

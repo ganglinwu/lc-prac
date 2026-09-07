@@ -227,15 +227,17 @@ type Delta struct {
 	NewSessions   int
 	NewAttempts   int
 	// NewWritten and UpdatedWritten count the drills you wrote yourself, which
-	// travel as text rather than as counters.
+	// travel as text rather than as counters. DeletedWritten counts the ones
+	// you deleted on another machine, which travel as tombstones.
 	NewWritten     int
 	UpdatedWritten int
+	DeletedWritten int
 }
 
 // Changed reports whether the merge actually moved anything.
 func (d Delta) Changed() bool {
 	return d.NewDrills+d.UpdatedDrills+d.NewSessions+d.NewAttempts+
-		d.NewWritten+d.UpdatedWritten > 0
+		d.NewWritten+d.UpdatedWritten+d.DeletedWritten > 0
 }
 
 // DiffStores describes what merged holds that local did not.
@@ -305,33 +307,37 @@ func Sync(c *Client, local *progress.Store) (*progress.Store, Delta, error) {
 // SyncDrills carries the drills you wrote yourself to the server and back, so
 // a drill written on the laptop can be practised on the desktop. Nothing is
 // written to dir unless apply is set, which is what makes a dry run possible.
-func SyncDrills(c *Client, dir string, apply bool) (newer, updated int, err error) {
-	local, err := drill.LoadUserDir(dir)
+func SyncDrills(c *Client, dir string, apply bool) (newer, updated, deleted int, err error) {
+	// Tombstones are loaded too: a push that quietly dropped them would ask
+	// the server to hand the deleted drill straight back.
+	local, err := drill.LoadUserDirAll(dir)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	body, err := drill.EncodeDrills(local)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	out, err := c.PushDrills(body)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	remote, err := drill.DecodeDrills(out)
 	if err != nil {
-		return 0, 0, fmt.Errorf("sync: server returned unreadable drills: %w", err)
+		return 0, 0, 0, fmt.Errorf("sync: server returned unreadable drills: %w", err)
 	}
 	merged := drill.MergeDrills(local, remote)
 	if !apply {
-		n, u := DiffDrills(local, merged)
-		return n, u, nil
+		n, u, d := DiffDrills(local, merged)
+		return n, u, d, nil
 	}
 	return drill.ApplyMerged(dir, merged)
 }
 
-// DiffDrills counts what merged holds that this machine's drills did not.
-func DiffDrills(local, merged []drill.Drill) (newer, updated int) {
+// DiffDrills counts what merged holds that this machine's drills did not. A
+// tombstone for a drill this machine never had counts as nothing, matching
+// what ApplyMerged would write.
+func DiffDrills(local, merged []drill.Drill) (newer, updated, deleted int) {
 	have := make(map[string]drill.Drill, len(local))
 	for _, d := range local {
 		have[d.ID] = d
@@ -340,10 +346,15 @@ func DiffDrills(local, merged []drill.Drill) (newer, updated int) {
 		old, ok := have[m.ID]
 		switch {
 		case !ok:
-			newer++
-		case !drill.SameDrill(old, m):
+			if !m.Deleted() {
+				newer++
+			}
+		case drill.SameDrill(old, m):
+		case m.Deleted() && !old.Deleted():
+			deleted++
+		default:
 			updated++
 		}
 	}
-	return newer, updated
+	return newer, updated, deleted
 }

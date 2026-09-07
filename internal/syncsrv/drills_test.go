@@ -185,3 +185,34 @@ func TestDrillsMethodNotAllowed(t *testing.T) {
 		t.Fatalf("status = %s, want 405", resp.Status)
 	}
 }
+
+// The server must store a tombstone rather than rejecting it as a drill with
+// no title, or a delete could never reach the machine that needs to hear it.
+func TestDrillsKeepsATombstone(t *testing.T) {
+	ts, _ := newTest(t)
+	stamp := epoch
+	gone := drill.Drill{ID: "drop", DeletedAt: &stamp}
+	if resp, _ := pushDrills(t, ts, testToken, []drill.Drill{testDrill("keep", "p", epoch), gone}); resp.StatusCode != http.StatusOK {
+		t.Fatalf("push of a tombstone: %s", resp.Status)
+	}
+	// A machine that still holds the live copy must get the delete back, not
+	// have its older copy win.
+	resp, body := pushDrills(t, ts, testToken, []drill.Drill{testDrill("drop", "p", epoch.Add(-time.Hour))})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("push of the stale live copy: %s", resp.Status)
+	}
+	out, err := drill.DecodeDrills(body)
+	if err != nil {
+		t.Fatalf("decoding merge: %v", err)
+	}
+	byID := map[string]drill.Drill{}
+	for _, d := range out {
+		byID[d.ID] = d
+	}
+	if !byID["drop"].Deleted() {
+		t.Fatalf("server merge = %+v, want drop to stay deleted", out)
+	}
+	if byID["keep"].Prompt != "p" {
+		t.Fatalf("server lost the kept drill: %+v", out)
+	}
+}

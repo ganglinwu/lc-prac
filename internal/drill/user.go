@@ -29,9 +29,20 @@ func UserDir() (string, error) {
 	return filepath.Join(home, ".local", "share", "lcprac", "drills"), nil
 }
 
-// LoadUserDir reads every *.json file in dir as drills. A missing directory is
-// not an error: most people never write their own.
+// LoadUserDir reads every *.json file in dir as the drills to practise, with
+// tombstones left out. A missing directory is not an error: most people never
+// write their own.
 func LoadUserDir(dir string) ([]Drill, error) {
+	all, err := LoadUserDirAll(dir)
+	if err != nil {
+		return nil, err
+	}
+	return LiveDrills(all), nil
+}
+
+// LoadUserDirAll is LoadUserDir including the tombstones, which sync needs:
+// dropping them here is what would resurrect a deleted drill on the next pull.
+func LoadUserDirAll(dir string) ([]Drill, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
