@@ -1,0 +1,125 @@
+[
+ {
+  "id": "inclusion-exclusion-when-and-cost",
+  "title": "What inclusion-exclusion actually buys",
+  "kind": "recall",
+  "topic": "inclusion-exclusion",
+  "difficulty": "hard",
+  "est_minutes": 5,
+  "prompt": "State inclusion-exclusion for n sets, say what shape a counting problem has to be in before you can apply it, and give the two things that decide whether the 2^n term count is affordable.",
+  "answer": "The size of a union is the alternating sum over non-empty subsets of the indices: |A1 u ... u An| = sum over non-empty S of (-1)^(|S|+1) times |intersection of the A_i for i in S|. The equivalent and usually more useful form counts the complement: the number of elements in none of the sets is sum over all S, including the empty one, of (-1)^|S| times the size of that intersection. The precondition is not that the sets be small or few, it is that every intersection be countable in closed form. That is what makes divisibility, coprimality, surjections and derangements standard inclusion-exclusion problems: intersecting 'divisible by d_i' conditions gives 'divisible by their lcm', which you count with one division, and intersecting 'misses colour i' conditions gives a power. If an intersection can only be counted by enumeration, inclusion-exclusion has bought you nothing. Two things decide the cost. First, n itself: 2^n is fine to about 25 and hopeless past 30, so a problem with more conditions needs the terms to collapse. Second, whether terms can be pruned or merged: subsets whose intersection is provably empty can be abandoned along with everything above them, and subsets whose intersections are equal can be batched, which is exactly what the Mobius function does when the conditions are 'divisible by p' for the primes of some number, collapsing 2^(number of primes) terms that share a value into one coefficient per squarefree divisor.",
+  "explanation": "The two forms matter in practice because the complement form is the one that composes. 'None of the conditions hold' is closed under adding more conditions and has the tidier signs, and most problems that look like unions ('how many are divisible by something') are easier stated as 'total minus how many are divisible by nothing'. The Mobius connection is worth holding explicitly: sum over squarefree d dividing n of mu(d) times f(n/d) is inclusion-exclusion over the distinct primes of n with the terms grouped by the product of the chosen primes. That reframing is what turns an exponential in the number of conditions into a linear pass over divisors, and it is why a sieve of mu over 10^6 answers coprimality queries that a subset walk could not. In an interview the reliable move is to write the complement form first, check that an arbitrary intersection has a formula, then count the conditions. If the count is large, look for the grouping; if there is none, inclusion-exclusion is the wrong tool and the answer is usually a DP over the conditions instead.",
+  "hints": [
+   "Write both the union form and the 'in none of them' form, and check the signs agree at n = 2.",
+   "What has to be true about an arbitrary intersection of the conditions before any of this is useful?"
+  ],
+  "refs": [
+   "LC 1201 Ugly Number III",
+   "CSES 2185 Counting Coprime Pairs",
+   "Concrete Mathematics chapter 4, Mobius inversion"
+  ]
+ },
+ {
+  "id": "inclusion-exclusion-derangement-choice",
+  "title": "Counting with too many conditions",
+  "kind": "choice",
+  "topic": "inclusion-exclusion",
+  "difficulty": "medium",
+  "est_minutes": 3,
+  "prompt": "You need the number of permutations of n items with no item in its own position, for n up to 10^6 and modulo a prime. Inclusion-exclusion over the n conditions 'item i is fixed' is correct. What do you do with it?",
+  "choices": [
+   "Notice every k-subset gives the same intersection size (n-k)!, so the 2^n terms collapse to n+1 terms: sum of (-1)^k * C(n,k) * (n-k)!",
+   "Enumerate the 2^n subsets but prune the ones whose intersection is empty, which keeps it under a million terms",
+   "Give up on inclusion-exclusion, since 2^10^6 terms can never be evaluated",
+   "Apply Mobius inversion over the divisors of n to group the terms"
+  ],
+  "answer": "Notice every k-subset gives the same intersection size (n-k)!, so the 2^n terms collapse to n+1 terms: sum of (-1)^k * C(n,k) * (n-k)!",
+  "explanation": "The number of conditions is not the number of distinct terms. Fixing any particular set of k items leaves the other n-k items free, so the intersection has size (n-k)! no matter which k items were chosen, and all C(n,k) subsets of that size contribute identically. That collapses the alternating sum to n+1 terms and gives the derangement formula D(n) = n! * sum of (-1)^k / k!, computable in O(n) with factorials and a modular inverse table. Pruning does not help here because no intersection is empty, so the second option is enumerating everything under a different name. The third confuses the number of conditions with the number of distinct terms, which is the actual lesson. Mobius inversion is the same collapsing idea but for divisibility conditions, where terms are grouped by the product of the chosen primes rather than by their count, so it is the right tool for a coprimality problem and the wrong one here. The general habit: after writing the alternating sum, ask what the intersection actually depends on. If it depends only on |S|, you have a binomial sum; if only on a product or lcm, you have a divisor sum; if on the individual elements, you are stuck with 2^n and n had better be small.",
+  "refs": [
+   "LC 634 Find the Derangement of An Array",
+   "CSES 1717 Christmas Party"
+  ]
+ },
+ {
+  "id": "probability-expectation-dp-setup",
+  "title": "Setting up an expected value DP",
+  "kind": "recall",
+  "topic": "probability",
+  "difficulty": "hard",
+  "est_minutes": 5,
+  "prompt": "Describe how to turn a random process into an expected value computation: what the states are, what the equation for one state looks like, and the two situations where a plain DP sweep is not enough.",
+  "answer": "Define E[s] as the expected remaining value from state s, fix E on the absorbing states, and write one equation per state: E[s] = cost of one step + sum over outcomes o of P(o) * E[next(s, o)]. That is a linear system, and whether you can solve it by a sweep depends only on the shape of the dependency graph. If every transition moves to a strictly later state under some ordering, the graph is a DAG and one sweep in reverse topological order is the answer. Two situations break that. The first is a self loop, where a state can transition to itself: E[s] appears on both sides, so collect its probability q and rearrange to E[s] = (cost + sum over the other outcomes) / (1 - q). This is still O(1) per state and is the case that includes 'reroll if the dice is too big' and 'a move that would overshoot is wasted'. The second is a genuine cycle between different states, for example a walk that can move backward as well as forward. No ordering makes that a DAG, so the system has to be solved as a system: Gaussian elimination in O(states^3) generally, or a linear-time forward substitution if the cycle is local, as with a one-dimensional walk where you write E[i] = a_i * E[i+1] + b_i and propagate the coefficients. Separately, linearity of expectation often removes the DP altogether: E[sum of indicators] = sum of P(each indicator), and that holds whether or not the indicators are independent, which is what makes 'expected number of X' problems collapse to counting.",
+  "explanation": "The single most useful check when setting these up is to ask whether the process can stay put. Interview problems put self loops in disguises: rerolling an out-of-range dice, a move blocked by a wall, a card drawn and returned. Every one of them means the naive recurrence is not a recurrence, and the fix is always the same one line of algebra. The failure is quiet: the numbers come out finite and plausible, just too small, because you have silently priced a wasted turn as free. The second check is whether the state can go backward. If it can, no reverse sweep exists and you either eliminate variables symbolically along the line or set up the matrix. The reason to keep linearity of expectation in front of both is that it needs no independence and no state at all: expected number of fixed points of a random permutation is n * (1/n) = 1 with no DP, and expected number of distinct values seen, expected number of comparisons, and expected number of records all fall the same way. Reach for the DP only after checking that the quantity is not a sum of indicators you can price one at a time.",
+  "hints": [
+   "Write the equation for one state, then ask whether E of that same state can appear on the right-hand side.",
+   "What property of the transition graph decides whether a single sweep is enough?"
+  ],
+  "refs": [
+   "LC 837 New 21 Game",
+   "CSES 1725 Dice Probability",
+   "LC 1230 Toss Strange Coins"
+  ]
+ },
+ {
+  "id": "probability-backward-walk-choice",
+  "title": "A walk that can go backward",
+  "kind": "choice",
+  "topic": "probability",
+  "difficulty": "medium",
+  "est_minutes": 3,
+  "prompt": "A token on positions 0..n moves right with probability p and left with probability 1-p each turn, and stops on reaching n; position 0 bounces it right. You want the expected number of turns from position 0, for n up to 200000. Your existing code sweeps i from n-1 down to 0. What happens and what is the fix?",
+  "choices": [
+   "The sweep is invalid because E[i] now depends on E[i-1] as well, so express each E[i] as a*E[i+1] + b, propagate a and b upward once, then resolve at the boundary",
+   "The sweep still works: substitute the not-yet-computed E[i-1] with zero, since the token rarely goes left",
+   "Solve the n by n linear system with Gaussian elimination, which is the only correct option",
+   "Reverse the sweep to run from 0 upward, which restores the dependency order"
+  ],
+  "answer": "The sweep is invalid because E[i] now depends on E[i-1] as well, so express each E[i] as a*E[i+1] + b, propagate a and b upward once, then resolve at the boundary",
+  "explanation": "Backward motion puts a two-way cycle between neighbouring states, so no ordering of the positions makes the dependency graph a DAG and neither sweep direction works: reversing it just swaps which unknown is missing. The system is still cheap to solve because it is tridiagonal. Start at the reflecting boundary, where E[0] = 1 + E[1] gives coefficients a=1, b=1 in the form E[0] = a*E[1] + b. Substituting that into the equation at i=1 gives E[1] in terms of E[2] alone, and inductively each E[i] = a_i * E[i+1] + b_i is obtained from the previous pair in O(1). At i = n-1 the right-hand side is E[n] = 0, which pins a number, and one downward pass unwinds the rest. That is O(n) and is the standard forward-elimination half of the Thomas algorithm. Gaussian elimination is correct but O(n^3) and unusable at n = 200000, so it is not 'the only option' and would not be the answer even if it were affordable. Substituting zero for the unknown is not an approximation, it is a different problem: for p below 1/2 the leftward drift dominates and the expected time is exponentially larger, so the error is unbounded rather than small.",
+  "refs": [
+   "CF 1265E Beautiful Bracket Sequence style expectation",
+   "Thomas algorithm for tridiagonal systems"
+  ]
+ },
+ {
+  "id": "aho-corasick-fail-links",
+  "title": "Fail links and dictionary links",
+  "kind": "recall",
+  "topic": "aho-corasick",
+  "difficulty": "hard",
+  "est_minutes": 5,
+  "prompt": "Define the fail link of an Aho-Corasick node, say why the links must be built breadth-first, and explain what a dictionary link is and why the counting pass can avoid following one.",
+  "answer": "A node represents the string spelled from the root to it. Its fail link points at the node for the longest proper suffix of that string which is also a node of the trie, with the root as the fallback. That is exactly KMP's failure function lifted from one pattern to a set. The construction is breadth-first because a node's link is computed from its parent's link: to find the link of the child of u along character c, you take the automaton transition from fail[u] on c, which is only meaningful once fail[u] and all of its outgoing transitions are already final. Since fail[u] is strictly shallower than u, processing by depth guarantees that. A dictionary link, also called an output link, is the nearest node reachable by repeatedly following fail links that is the end of some pattern. It exists because the set of patterns ending at text position i is the current node's pattern, if any, plus every pattern found by walking the fail chain, and skipping over the non-terminal nodes on that chain is what makes reporting proportional to the number of matches rather than to the depth. If you only need counts and not positions, you do not need to walk the chain at all: increment a counter on the node you land on for each text character, then after the scan add each node's counter into its fail link's counter in reverse BFS order. Every node then holds the number of text positions at which it or any node failing into it was current, which is exactly its pattern's occurrence count, computed in one linear pass over the nodes instead of one chain walk per character.",
+  "explanation": "The reverse-BFS accumulation is the detail that separates a working implementation from a quadratic one, and it is worth seeing why it is a tree. Fail links always go to a strictly shallower node, so they form a forest rooted at the root, and pushing counts from deep to shallow is a subtree sum. The chain-walking version is genuinely O(text * max depth) in the worst case, which a text of a's and patterns a, aa, aaa, ... makes real. There is a second trap in the same area: reporting positions rather than counts is unavoidably output-sensitive, so that same input produces a quadratic number of matches and no algorithm can beat it, which is why problems ask for counts. On memory, an array of 26 transitions per node is the fast choice and costs about 104 bytes per node, so a million nodes is 100MB and at that point a map or a sorted child list is the trade, giving up constant-time transitions for a factor of several in space. The other thing to keep straight is that converting missing edges into real transitions turns the trie into a deterministic automaton, after which the scan has no loop at all: one state, one array lookup, one increment per character.",
+  "hints": [
+   "What is the analogue of KMP's failure function when there is more than one pattern?",
+   "Fail links point strictly upward. What structure does that make, and what does an accumulation over that structure buy you?"
+  ],
+  "refs": [
+   "CSES 2103 String Matching",
+   "LC 1032 Stream of Characters",
+   "Aho and Corasick 1975, Efficient string matching"
+  ]
+ },
+ {
+  "id": "aho-corasick-vs-alternatives-choice",
+  "title": "When a trie alone is not enough",
+  "kind": "choice",
+  "topic": "aho-corasick",
+  "difficulty": "medium",
+  "est_minutes": 3,
+  "prompt": "You have a trie of 100000 patterns and a 10^6 character text, and you want every occurrence counted. You scan by starting a fresh trie descent at each text position, stopping when it dies. What is wrong with that?",
+  "choices": [
+   "It is O(text * longest pattern) because each restart rescans characters, and the fail links exist precisely to reuse the matched prefix instead of restarting",
+   "Nothing is wrong asymptotically; it just has a bad constant from the repeated root lookups",
+   "It misses patterns that start at positions the descent skipped over",
+   "It double counts patterns that are suffixes of other patterns"
+  ],
+  "answer": "It is O(text * longest pattern) because each restart rescans characters, and the fail links exist precisely to reuse the matched prefix instead of restarting",
+  "explanation": "The restart-per-position scan is correct, it just throws away work: having matched a long prefix ending at position i, it forgets all of it and starts again at i+1, so with patterns of length L it costs O(text * L). This is the same relationship naive matching has with KMP, and the fail link is the same fix: it names the longest already-matched suffix that is still a live prefix, so the automaton keeps its position instead of restarting. That gives O(1) amortised per character, and once missing edges are rewritten to point where the fail link would send them, O(1) worst case with no loop. The third and fourth options describe bugs the restart scan does not have: it does start a descent at every position, so it misses nothing, and a pattern that is a suffix of another is a separate trie node reached on its own descent, so nothing is double counted. That is worth knowing because it is the failure mode of the opposite mistake, a single automaton scan that counts only the node it lands on and never propagates along fail links, which undercounts exactly those suffix patterns. The practical signature for reaching for Aho-Corasick is many patterns against one text; for one pattern use KMP or Z, and for many texts against one pattern set that changes rarely, the automaton is worth building once and reusing.",
+  "refs": [
+   "CSES 2103 String Matching",
+   "LC 1408 String Matching in an Array"
+  ]
+ }
+]

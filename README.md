@@ -8,22 +8,23 @@ The idea: after a break from grinding, what decays first is not your ability to
 code, it is instant recall of *which pattern applies and why it is correct*.
 These drills target that recall directly.
 
-The deck ships 150 drills across 47 topics (hashmap, two-pointers,
-sliding-window, binary-search, strings, string-matching, string-dp, sorting,
-stack, monotonic-stack, deque, heap, linked-list, trees, tree-dp, trie, lca,
-graphs, scc, union-find, mst, topological-sort, shortest-path, max-flow,
-bipartite-matching, matrix, matrix-exponentiation, geometry, intervals,
-prefix-sum, fenwick, segment-tree, sqrt-decomposition, dp, bitmask-dp,
-digit-dp, greedy, backtracking, meet-in-the-middle, bit-manipulation, math,
-number-theory, game-theory, randomized, concurrency, design, complexity), 46 of
+The deck ships 159 drills across 50 topics (hashmap, two-pointers,
+sliding-window, binary-search, strings, string-matching, aho-corasick,
+string-dp, sorting, stack, monotonic-stack, deque, heap, linked-list, trees,
+tree-dp, trie, lca, graphs, scc, union-find, mst, topological-sort,
+shortest-path, max-flow, bipartite-matching, matrix, matrix-exponentiation,
+geometry, intervals, prefix-sum, fenwick, segment-tree, sqrt-decomposition, dp,
+bitmask-dp, digit-dp, greedy, backtracking, meet-in-the-middle,
+bit-manipulation, math, number-theory, inclusion-exclusion, game-theory,
+probability, randomized, concurrency, design, complexity), 49 of
 which are machine-graded
 code drills: every topic except complexity has at least one drill where you type
 the function and the toolchain grades it. Drills are graded easy, medium or
 hard; `-diff hard` is the interview-hard tier (segment trees, DP over subsets,
 binary lifting, strongly connected components, max flow, augmenting paths for
-bipartite matching, the KMP prefix function, matrix exponentiation, rerooting a
-tree DP, convex hulls, digit DP, Grundy values, meet in the middle, Mo's
-algorithm).
+bipartite matching, the KMP prefix function, Aho-Corasick fail links, matrix
+exponentiation, rerooting a tree DP, convex hulls, digit DP, Grundy values,
+meet in the middle, Mo's algorithm, expected-value DP with self loops).
 
 ## Usage
 
