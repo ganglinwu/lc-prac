@@ -8,17 +8,18 @@ The idea: after a break from grinding, what decays first is not your ability to
 code, it is instant recall of *which pattern applies and why it is correct*.
 These drills target that recall directly.
 
-The deck ships 114 drills across 35 topics (hashmap, two-pointers,
-sliding-window, binary-search, strings, string-dp, sorting, stack,
-monotonic-stack, deque, heap, linked-list, trees, trie, lca, graphs, scc,
-union-find, topological-sort, shortest-path, max-flow, matrix, intervals,
-prefix-sum, fenwick, segment-tree, dp, bitmask-dp, greedy, backtracking,
-bit-manipulation, math, concurrency, design, complexity), 34 of which are
-machine-graded code
+The deck ships 123 drills across 38 topics (hashmap, two-pointers,
+sliding-window, binary-search, strings, string-matching, string-dp, sorting,
+stack, monotonic-stack, deque, heap, linked-list, trees, trie, lca, graphs,
+scc, union-find, mst, topological-sort, shortest-path, max-flow, matrix,
+matrix-exponentiation, intervals, prefix-sum, fenwick, segment-tree, dp,
+bitmask-dp, greedy, backtracking, bit-manipulation, math, concurrency, design,
+complexity), 37 of which are machine-graded code
 drills: every topic except complexity has at least one drill where you type the
 function and the toolchain grades it. Drills are graded easy, medium or hard;
 `-diff hard` is the interview-hard tier (segment trees, DP over subsets,
-binary lifting, strongly connected components, max flow).
+binary lifting, strongly connected components, max flow, the KMP prefix
+function, matrix exponentiation).
 
 ## Usage
 

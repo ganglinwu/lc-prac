@@ -1,0 +1,136 @@
+[
+  {
+    "id": "string-matching-no-rewind",
+    "title": "Why KMP never backs up in the text",
+    "kind": "recall",
+    "topic": "string-matching",
+    "difficulty": "hard",
+    "est_minutes": 4,
+    "prompt": "Naive substring search restarts the pattern at the next text position after a mismatch. State what KMP knows at the moment of a mismatch that lets it keep the text pointer where it is, and give the total-work argument for O(n + m).",
+    "answer": "At a mismatch after matching j characters, you know the last j characters of the text are exactly pattern[:j]. So any shorter alignment that could still succeed must have the pattern's prefix sitting inside that matched region, which means it must be a prefix of pattern[:j] that is also a suffix of it: a border. The failure table already stores the longest such border, so you set j = pi[j-1] and compare the same text character again, never moving the text pointer backwards. The cost argument is amortised, not per-step: the text pointer advances n times and each advance raises j by at most one, so j increases at most n times in total; since every failure step strictly decreases j and j never goes below zero, there can be at most n decreases across the whole scan. Building the table is the same loop over the pattern, giving O(n + m) time and O(m) extra space.",
+    "explanation": "The reason naive search is quadratic is that it throws away work: it has just proved that a chunk of text equals a chunk of the pattern, then forgets it. The failure table is precomputed self-knowledge about the pattern, not about the text, which is why it can be built once and reused across any number of texts. The same idea reappears as the Aho-Corasick automaton for many patterns at once, where the failure link points at the longest suffix that is a prefix of some other pattern. In an interview the amortised argument is the part that gets probed, because a nested while loop looks quadratic until you count total increases against total decreases.",
+    "hints": [
+      "Write down what you have proved about the text characters behind the pointer at the moment the comparison fails.",
+      "Do not count the inner loop per outer step; count how much the match length can grow over the whole run and how much it can therefore shrink."
+    ],
+    "refs": [
+      "LC 28 Find the Index of the First Occurrence in a String",
+      "LC 1392 Longest Happy Prefix",
+      "LC 214 Shortest Palindrome"
+    ]
+  },
+  {
+    "id": "string-matching-hash-or-automaton",
+    "title": "Rolling hash or prefix function",
+    "kind": "choice",
+    "topic": "string-matching",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "You must answer many queries of the form 'are these two substrings of one fixed 10^6-character string equal?', with the substrings given as index ranges at query time. Which tool, and why not the other?",
+    "choices": [
+      "A rolling hash with precomputed prefix hashes, because it answers an arbitrary pair of ranges in O(1) while a failure table is built for one fixed pattern",
+      "The KMP prefix function, because it is exact while hashing can collide",
+      "Build a suffix automaton, since substring equality is not answerable by either of the others",
+      "Sort all substrings once, then binary search each query"
+    ],
+    "answer": "A rolling hash with precomputed prefix hashes, because it answers an arbitrary pair of ranges in O(1) while a failure table is built for one fixed pattern",
+    "explanation": "The two tools are not competing implementations of one operation. A failure table is compiled from a specific pattern and then streams a text against it, so a query whose pattern is only known at query time would need a fresh O(m) table each time. Prefix hashes are compiled from the text and support any range, because the hash of a range is a subtraction and a shift. The collision objection is real but priced: a single 64-bit modulus is attackable and can be beaten by anti-hash tests, so use two moduli or a random base chosen at run time, which drops the collision probability to negligible for 10^6 queries. Suffix automata do answer this, but they are a far heavier build for a query the hash handles in two lines. Sorting substrings is not even well defined here, since there are O(n^2) of them.",
+    "hints": [
+      "Ask which of the two is compiled from the pattern and which is compiled from the text, then ask which one is fixed in this problem."
+    ],
+    "refs": [
+      "LC 1044 Longest Duplicate Substring",
+      "LC 187 Repeated DNA Sequences",
+      "LC 1147 Longest Chunked Palindrome Decomposition"
+    ]
+  },
+  {
+    "id": "mst-cut-property",
+    "title": "The one rule behind Kruskal and Prim",
+    "kind": "recall",
+    "topic": "mst",
+    "difficulty": "medium",
+    "est_minutes": 4,
+    "prompt": "State the cut property and sketch why it holds, then say how Kruskal and Prim are each the same rule applied with a different choice of cut.",
+    "answer": "Cut property: for any partition of the vertices into two non-empty sides, a minimum-weight edge crossing that partition belongs to some minimum spanning tree (and to every MST if its weight is strictly the smallest crossing weight). The exchange argument: take any MST T that does not contain such an edge e. Adding e to T makes exactly one cycle, and that cycle must cross the partition a second time, so it contains another crossing edge f with weight at least that of e. Swapping f out for e keeps the graph spanning and acyclic and does not increase the total, so the result is still an MST and it contains e. Prim applies this with the cut between the tree grown so far and everything else, taking the cheapest edge leaving the tree. Kruskal applies it with the cut between the two components its next accepted edge joins: when the cheapest unused edge has endpoints in different components, no cheaper edge crosses that particular cut, because any cheaper one was already examined and would have merged them.",
+    "explanation": "Both algorithms are greedy and both are correct for the same reason, which is why 'which one should I use' is a performance question, not a correctness one: Kruskal when the input is an edge list and the graph is sparse, since it is dominated by the sort at O(m log m); Prim with a binary heap for similar cost, or Prim with an array scan at O(n^2) when the graph is dense enough that m is near n^2 and the heap overhead is not worth it. The tie-break clause matters in practice: with distinct weights the MST is unique, and with ties there can be many, which is what makes 'find every edge that appears in some MST' a separate and harder question.",
+    "hints": [
+      "Start with an MST that lacks the edge, add the edge anyway, and look at what that creates.",
+      "For each algorithm, name the two sides of the partition it is implicitly choosing at each step."
+    ],
+    "refs": [
+      "LC 1584 Min Cost to Connect All Points",
+      "LC 1489 Find Critical and Pseudo-Critical Edges in MST"
+    ]
+  },
+  {
+    "id": "mst-vs-shortest-path",
+    "title": "Spanning tree or shortest path tree",
+    "kind": "choice",
+    "topic": "mst",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "You need the cheapest set of roads that keeps every town reachable from the capital, and a colleague suggests running Dijkstra from the capital and keeping the tree it builds. What is wrong with that?",
+    "choices": [
+      "Dijkstra's tree minimises each town's distance to the capital, not the total edge weight, and those are different objectives that pick different trees",
+      "Nothing is wrong: a shortest path tree is always a minimum spanning tree",
+      "Dijkstra cannot build a tree, only distances, so there is nothing to keep",
+      "It only fails when the graph has negative weights, which road networks do not have"
+    ],
+    "answer": "Dijkstra's tree minimises each town's distance to the capital, not the total edge weight, and those are different objectives that pick different trees",
+    "explanation": "The smallest counterexample is a triangle: capital c with c-a = 5, c-b = 5, a-b = 1. Dijkstra's tree keeps c-a and c-b for a total of 10, because that is what makes each town's distance from the capital as small as possible. The MST is a-b plus c-a for a total of 6, and in it town b sits 6 from the capital rather than 5. Neither tree is wrong; they answer different questions, and only one of them is 'cheapest roads'. Greedy on 'cheapest edge crossing a cut' and greedy on 'closest unfinished vertex' are the same loop shape with a different key, which is why the two algorithms look almost identical and why the substitution is so tempting. The negative-weight point is a real Dijkstra limitation but not the bug here; MST algorithms handle negative weights fine, since no part of the exchange argument depends on the sign.",
+    "hints": [
+      "Write down the objective function each algorithm is minimising, in words, and check whether they are the same function."
+    ],
+    "refs": [
+      "LC 1584 Min Cost to Connect All Points",
+      "LC 743 Network Delay Time"
+    ]
+  },
+  {
+    "id": "matrix-exponentiation-transfer-matrix",
+    "title": "Turning a recurrence into a matrix",
+    "kind": "recall",
+    "topic": "matrix-exponentiation",
+    "difficulty": "hard",
+    "est_minutes": 5,
+    "prompt": "A DP has d states and its transition is a fixed linear map that does not depend on the step index. Describe how to write one step as a matrix, what raising it to the k-th power means, what the running time is, and what disqualifies a DP from this treatment.",
+    "answer": "Write the state as a column vector v of length d. If the transition is v' = M v with M's entry [i][j] being the coefficient of old state j in new state i, then k steps is M^k v, and computing M^k by repeated squaring costs O(d^3 log k) multiplications rather than O(d^2 k) steps. For a linear recurrence like f(n) = a f(n-1) + b f(n-2), the state is the window of the last d values, M's first row holds the coefficients and the remaining rows are a shift (an identity block offset by one) that slides the window. Read as a graph, M is a weighted adjacency matrix and M^k[i][j] is the total weight of all length-k walks from j to i, which is why walk counting and linear recurrences are the same computation. It is disqualified when the transition is not linear (a max or a min in the recurrence, or a product of two state variables), or when the coefficients depend on the step index so there is no single matrix to raise, or when d is large enough that d^3 log k beats the direct loop.",
+    "explanation": "The useful reflex is the constraint shape: n or k up to 10^9 or 10^18 with a small number of states is the giveaway, because no per-step loop survives that range and the state count being small is what makes a cubic-per-multiply cost affordable. Note the escape hatch for max-plus recurrences: swapping (plus, times) for (max, plus) gives the tropical semiring, where the same repeated-squaring code computes the maximum-weight length-k walk, since associativity is all the squaring argument needs. And identify the identity carefully: M^0 must be the identity matrix, which is the base case that makes k=0 answer correctly instead of needing a special branch.",
+    "hints": [
+      "Ask what has to be true of the transition for two steps to be the composition of one step with itself.",
+      "For a two-term recurrence, what must the state vector hold so that the next state is a function of it alone?",
+      "Repeated squaring needs only one algebraic property of the operation. Name it, then ask which recurrences lack it."
+    ],
+    "refs": [
+      "LC 1220 Count Vowels Permutation",
+      "LC 552 Student Attendance Record II",
+      "LC 70 Climbing Stairs"
+    ]
+  },
+  {
+    "id": "matrix-exponentiation-when-to-reach",
+    "title": "When the matrix trick pays",
+    "kind": "choice",
+    "topic": "matrix-exponentiation",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "Which of these should you solve with matrix exponentiation?",
+    "choices": [
+      "Count strings of length 10^18 over a 5-letter alphabet avoiding a fixed set of adjacent pairs, modulo 10^9+7",
+      "Count strings of length 10^18 over a 5-letter alphabet that contain at most 10^18 vowels total",
+      "Find the maximum sum of any contiguous subarray of a 10^6-element array",
+      "Count paths in a DAG on 200000 vertices from source to sink"
+    ],
+    "answer": "Count strings of length 10^18 over a 5-letter alphabet avoiding a fixed set of adjacent pairs, modulo 10^9+7",
+    "explanation": "The first option is the textbook fit: the state is the last letter, so there are 5 states, the transition is the same allowed-pair matrix at every step, and the length is far past any per-step loop. That is 5x5 matrices and about 60 squarings. The second option has a bound that is not binding, so it is just the unrestricted count and needs no machinery. Maximum subarray is linear and has a max in its recurrence, so there is no matrix over the usual ring at all. Counting DAG paths is a single topological-order pass at O(V + E); the transition there is not one repeated map but a different sparse step per vertex, and 200000 states would make one matrix multiply alone about 10^16 operations. The pattern to internalise is 'huge step count, tiny state count, step-independent linear transition'; drop any one of the three and this is the wrong tool.",
+    "hints": [
+      "Three things must hold at once: the number of steps, the number of states, and whether every step applies the same linear map. Check each option against all three."
+    ],
+    "refs": [
+      "LC 1220 Count Vowels Permutation",
+      "LC 53 Maximum Subarray",
+      "LC 797 All Paths From Source to Target"
+    ]
+  }
+]
