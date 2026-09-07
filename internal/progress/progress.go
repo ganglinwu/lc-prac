@@ -3,7 +3,6 @@
 package progress
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -103,28 +102,16 @@ func New(path string) *Store {
 
 // Load reads the store at path, treating a missing file as an empty history.
 func Load(path string) (*Store, error) {
-	s := New(path)
 	b, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		return s, nil
+		return New(path), nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	var f file
-	if err := json.Unmarshal(b, &f); err != nil {
-		return nil, fmt.Errorf("progress: parsing %s: %w", path, err)
-	}
-	for _, r := range f.Records {
-		if r.DrillID != "" {
-			s.records[r.DrillID] = r
-		}
-	}
-	s.sessions = f.Sessions
-	for _, a := range f.Attempts {
-		if a.Ref != "" {
-			s.attempts = append(s.attempts, a)
-		}
+	s, err := Decode(path, b)
+	if err != nil {
+		return nil, fmt.Errorf("progress: reading %s: %w", path, err)
 	}
 	return s, nil
 }
@@ -137,8 +124,7 @@ func (s *Store) Save() error {
 	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
 		return err
 	}
-	f := file{Version: 1, Records: s.Records(), Sessions: s.sessions, Attempts: s.attempts}
-	b, err := json.MarshalIndent(f, "", "  ")
+	b, err := s.Encode()
 	if err != nil {
 		return err
 	}
@@ -147,7 +133,7 @@ func (s *Store) Save() error {
 		return err
 	}
 	defer os.Remove(tmp.Name())
-	if _, err := tmp.Write(append(b, '\n')); err != nil {
+	if _, err := tmp.Write(b); err != nil {
 		tmp.Close()
 		return err
 	}

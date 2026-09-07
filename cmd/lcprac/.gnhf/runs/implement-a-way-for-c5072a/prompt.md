@@ -1,0 +1,1 @@
+implement a way for me to sync my progress across machines, i have a lightsail vps on aws (fronted by caddy) so you could use that i guess. domain name is guenyanghae.com. you can use aws cli to poke around. you could also include more questions in the bank.
