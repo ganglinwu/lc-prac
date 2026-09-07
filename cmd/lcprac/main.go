@@ -141,7 +141,7 @@ func usage() {
   next to the model answer.
 
   kinds:        recall, choice, complexity, snippet, code
-  difficulties: easy, medium
+  difficulties: easy, medium, hard
 `)
 }
 
@@ -149,7 +149,7 @@ func usage() {
 func drillFlags(fs *flag.FlagSet) (topic, kind, diff *string) {
 	topic = fs.String("topic", "", "only this topic")
 	kind = fs.String("kind", "", "only this kind (recall, choice, complexity, snippet, code)")
-	diff = fs.String("diff", "", "only this difficulty (easy, medium)")
+	diff = fs.String("diff", "", "only this difficulty (easy, medium, hard)")
 	return topic, kind, diff
 }
 

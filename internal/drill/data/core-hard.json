@@ -1,0 +1,82 @@
+[
+  {
+    "id": "segment-tree-vs-fenwick",
+    "title": "When a Fenwick tree is not enough",
+    "kind": "choice",
+    "topic": "segment-tree",
+    "difficulty": "hard",
+    "est_minutes": 3,
+    "prompt": "You already have a Fenwick tree doing point update and prefix sum in O(log n). Which requirement forces you to reach for a segment tree instead?",
+    "choices": [
+      "Range updates combined with range queries, or a query whose combining operation has no inverse, such as range minimum",
+      "An array larger than a million elements",
+      "Queries that ask for a sum over an inclusive range rather than a prefix",
+      "Updates that arrive faster than queries"
+    ],
+    "answer": "Range updates combined with range queries, or a query whose combining operation has no inverse, such as range minimum",
+    "explanation": "A Fenwick tree computes an inclusive range from two prefixes by subtraction, so it needs the operation to have an inverse: sums and xors qualify, minimum does not. It also handles range update with point query via a difference array, and the range-update-range-query pair only with two coupled trees. A segment tree stores an explicit value per node, so any associative merge works, and a lazy tag gives range updates directly. Size is irrelevant, both are O(log n), and the Fenwick tree is the smaller and faster of the two whenever it applies.",
+    "hints": [
+      "Ask what a Fenwick tree does to turn two prefix answers into one range answer."
+    ],
+    "refs": [
+      "LC 307 Range Sum Query - Mutable",
+      "LC 715 Range Module"
+    ]
+  },
+  {
+    "id": "segment-tree-lazy-invariant",
+    "title": "What the lazy tag means",
+    "kind": "recall",
+    "topic": "segment-tree",
+    "difficulty": "hard",
+    "est_minutes": 4,
+    "prompt": "In a lazy segment tree, state precisely what lazy[node] means about node and about its children, and say at which moments it has to be pushed down.",
+    "answer": "node's own stored value is always correct and already includes everything applied to it. lazy[node] is an update that has been applied to node's aggregate but not yet to either child, so the children are stale by exactly that amount. It must be pushed down immediately before descending into the children, which happens on any update or query that only partially overlaps node's range, and never at any other time: a node that is fully covered by the operation absorbs it into its own value and tag and stops.",
+    "explanation": "Getting the invariant right is what makes the code short. Because the node is already correct, a fully covered query can return its value without touching anything below it, and a fully covered update can stop there too. Only a partial overlap forces you to look at the children, and that is the one place staleness would be observable, so that is the only place a push is needed. The mirror of the push is the pull: after recursing on a partial overlap you recompute the node from its children.",
+    "hints": [
+      "Ask which of the node and its children is allowed to be wrong, and when that wrongness could ever be noticed."
+    ],
+    "refs": [
+      "LC 699 Falling Squares",
+      "LC 218 The Skyline Problem"
+    ]
+  },
+  {
+    "id": "bitmask-dp-state-cost",
+    "title": "The cost of DP over subsets",
+    "kind": "complexity",
+    "topic": "bitmask-dp",
+    "difficulty": "hard",
+    "est_minutes": 4,
+    "prompt": "You solve the n-by-n assignment problem with dp[mask] = cheapest way to serve the first popcount(mask) workers using exactly the tasks in mask. Give the time and space, explain why the worker index needs no dimension of its own, and say roughly where n stops being feasible.",
+    "answer": "O(2^n * n) time and O(2^n) space. The worker index is not a separate dimension because the mask determines it: every path to a given mask has assigned one task per set bit, so exactly popcount(mask) workers have been served no matter which order they were served in. Each of the 2^n masks tries at most n unset bits. At n = 20 that is about 20 million steps and still fine; by n = 24 it is 400 million states-times-transitions and around 134 MB of table, which is where it stops being practical.",
+    "explanation": "Adding a redundant worker dimension is the classic waste here: dp[mask][worker] is n times bigger and every entry with worker != popcount(mask) is unreachable. The other detail worth keeping is the iteration order. Masks can be visited in plain increasing numeric order because removing a bit strictly decreases the number, so all predecessors of a mask are already final, which is what lets the loop be flat instead of recursive.",
+    "hints": [
+      "Count the states, then count the transitions leaving one state.",
+      "Given only the mask, can you tell how many workers have been assigned?"
+    ],
+    "refs": [
+      "LC 1879 Minimum XOR Sum of Two Arrays",
+      "LC 698 Partition to K Equal Sum Subsets"
+    ]
+  },
+  {
+    "id": "bitmask-submask-enumeration",
+    "title": "Enumerating the submasks of a mask",
+    "kind": "recall",
+    "topic": "bitmask-dp",
+    "difficulty": "hard",
+    "est_minutes": 4,
+    "prompt": "Some subset DPs need every submask of a mask, not just every single bit: partitioning a set into valid groups, for instance. Write the loop that enumerates the submasks of mask, explain why the step works, and give the total cost of doing it for all 2^n masks.",
+    "answer": "for sub := mask; sub > 0; sub = (sub - 1) & mask, with the empty submask handled separately if it is needed. Subtracting one from sub borrows through its lowest set bit, clearing that bit and setting every zero below it; masking with mask discards the bits that were never in mask, leaving the next smaller submask in decreasing numeric order. Over all masks the total is sum over k of C(n,k)*2^k = 3^n, because each of the n elements is independently in neither set, in mask only, or in both.",
+    "explanation": "3^n is the number to recognise: it is why subset-partition DP is feasible to about n = 18 (387 million, borderline) and comfortable to n = 15 (14 million), while the same problem framed as choosing an ordering is not. The loop's guard is sub > 0 rather than sub >= 0 because (0-1) & mask is mask again and the loop would never end, which is the standard bug; if the empty submask matters, do it once outside the loop.",
+    "hints": [
+      "Think about what subtracting one does to the bits below and including the lowest set bit.",
+      "For the total, ask what three choices each element has across a mask and one of its submasks."
+    ],
+    "refs": [
+      "LC 698 Partition to K Equal Sum Subsets",
+      "LC 1723 Find Minimum Time to Finish All Jobs"
+    ]
+  }
+]

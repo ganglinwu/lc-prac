@@ -8,14 +8,15 @@ The idea: after a break from grinding, what decays first is not your ability to
 code, it is instant recall of *which pattern applies and why it is correct*.
 These drills target that recall directly.
 
-The deck ships 90 drills across 27 topics (hashmap, two-pointers,
+The deck ships 96 drills across 29 topics (hashmap, two-pointers,
 sliding-window, binary-search, strings, sorting, stack, deque, heap,
 linked-list, trees, trie, graphs, union-find, topological-sort, shortest-path,
-matrix, intervals, prefix-sum, fenwick, dp, greedy, backtracking,
-bit-manipulation, math, design, complexity), 26
+matrix, intervals, prefix-sum, fenwick, segment-tree, dp, bitmask-dp, greedy,
+backtracking, bit-manipulation, math, design, complexity), 28
 of which are machine-graded code
 drills: every topic except complexity has at least one drill where you type the
-function and the toolchain grades it.
+function and the toolchain grades it. Drills are graded easy, medium or hard;
+`-diff hard` is the interview-hard tier (segment trees, DP over subsets).
 
 ## Usage
 

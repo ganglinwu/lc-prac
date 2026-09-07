@@ -83,7 +83,7 @@ func addDrill(in io.Reader, out io.Writer, deck *drill.Set, path string, pre pro
 	if d.Topic, err = a.topic(deck, pre.Topic); err != nil {
 		return err
 	}
-	diff, err := a.choose("difficulty", []string{"easy", "medium"}, "medium")
+	diff, err := a.choose("difficulty", []string{"easy", "medium", "hard"}, "medium")
 	if err != nil {
 		return err
 	}

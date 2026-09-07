@@ -118,7 +118,7 @@ func TestAddDrillRepromptsOnBadInput(t *testing.T) {
 		"",       // empty title
 		"Two pointer shrink",
 		"two-pointers",
-		"hard", // not a difficulty
+		"brutal", // not a difficulty
 		"easy",
 		"When do you move the left pointer?",
 		"When the window is invalid.",

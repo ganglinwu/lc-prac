@@ -31,6 +31,7 @@ type Difficulty string
 const (
 	Easy   Difficulty = "easy"
 	Medium Difficulty = "medium"
+	Hard   Difficulty = "hard"
 )
 
 // CodeSpec is the machine-checkable half of a code drill: what the user starts
@@ -89,7 +90,7 @@ func (d Drill) Validate() error {
 		return fmt.Errorf("drill %s: unknown kind %q", d.ID, d.Kind)
 	}
 	switch d.Difficulty {
-	case Easy, Medium:
+	case Easy, Medium, Hard:
 	default:
 		return fmt.Errorf("drill %s: unknown difficulty %q", d.ID, d.Difficulty)
 	}
