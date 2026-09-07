@@ -236,3 +236,26 @@ Objective: see .gnhf/runs/implement-a-way-for-c5072a/prompt.md
 - When a big test needs a known answer at a size where no reference implementation can run, look for an input whose answer is a number-theoretic identity rather than a computation. A directed cycle of length c makes walks of length k land at k mod c, and picking c = 101 (a divisor of 10^18 + 1) makes k = 10^18 land exactly on the last vertex, so the expected value is 1 with no oracle in the test file at all. This is the counterpart to iteration 11's exponential-oracle-on-tiny-inputs trick, for the case where the input cannot be tiny.
 - A large-n timing test can fail for the wrong reason. The O(n^2) Prim reference written with an n-by-n weight matrix would OOM at n=300000 rather than time out, which grades as a failure but teaches nothing; the version a user would actually write (adjacency list plus a full dist scan) has no memory blowup and was the right thing to measure. Measure the naive solution someone would plausibly write, not the most convenient naive to code up in a test file.
 - TestBuiltinTopicsAreUsable and TestEveryTopicHasCodeDrill together mean a new topic is only additive at exactly three drills or more: two to clear the usable bar, one of which must be a code drill. The established one-code-plus-two-conceptual shape is the minimum, not a convention, which is worth knowing before designing a topic whose natural content is only conceptual.
+
+### Iteration 14
+
+**Summary:** Added tombstone-based deletion to cross-machine drill sync, so a drill deleted on one machine stays deleted everywhere instead of being resurrected by the next pull, verified by 12 new tests and a live two-machine run against the deployed VPS.
+
+**Changes:**
+- drill.Drill gained a deleted_at field making a tombstone a first-class drill: Validate accepts it on its id alone, Deleted()/Tombstone() helpers exist, and all content fields are now omitempty so a tombstone serializes as just id plus timestamp
+- MergeDrills treats a deletion as an edit (editedAt takes the later of updated_at and deleted_at), so a later delete beats a live copy from either side and a later rewrite undoes a delete; SameDrill distinguishes a tombstone from its live counterpart
+- LoadUserDir now returns only live drills while the new LoadUserDirAll keeps tombstones for sync, and SyncDrills pushes the tombstones (dropping them is what would resurrect the drill)
+- ApplyMerged writes a tombstone over the local live copy in place, reports deletions as their own count, and ignores a tombstone for a drill this machine never had so no junk file is created
+- drill.DeleteDrill plus the new `lcprac mine -rm ID` command tombstone every copy of a drill on this machine, with distinct messages for already-deleted and not-yours ids
+- `lcprac sync` and the automatic session sync report "N drill(s) you deleted on another machine", including in dry-run mode, via a new DeletedWritten field on the Delta
+- 12 new tests covering tombstone validation/encoding, delete-wins and rewrite-undoes merges, DeleteDrill on multiple files, ApplyMerged delete accounting and idempotence, end-to-end delete propagation and non-resurrection through a test server, and the real server storing a tombstone
+- README and CLI help document deleting a drill and why a hand-edited deletion comes back, with the tombstone rationale spelled out
+- lcpracd redeployed to lcprac.guenyanghae.com so the live server accepts tombstones; a live two-machine run confirmed create/propagate/delete/stay-deleted, and the temporary drills document was removed from the VPS afterwards
+
+**Learnings:**
+- The drill sync merge was union-only, so deletion was impossible by construction: a drill removed from a JSON file came back on the next pull. This was a live correctness bug in a shipped feature, not a missing nicety.
+- Because the server validates uploaded drills with drill.DecodeDrills, any change to what counts as a valid drill (like a content-free tombstone) is a protocol change requiring a redeploy before the feature works end-to-end; deploy/deploy.sh handled it unchanged.
+- Adding a field that changes a merge's tie-breaking means SameDrill must also ignore it (it compares canonical JSON with timestamps stripped) or every synced drill reads as changed forever.
+- The server had no ganglin.drills.json at all before this iteration, which made live verification fully reversible: create the document by testing, then sudo rm it to restore the pristine account state.
+- A rewrite that lands on a local tombstone is reported as an update rather than a new drill, because the id already has a home in the file; the intuitive expectation (a new drill) is wrong.
+- macOS has no `timeout` binary, so wrap long shell steps with the Bash tool's own timeout rather than the coreutils command.

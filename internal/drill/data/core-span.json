@@ -1,0 +1,126 @@
+[
+  {
+    "id": "tree-dp-reroot-transition",
+    "title": "What rerooting needs from the aggregate",
+    "kind": "recall",
+    "topic": "tree-dp",
+    "difficulty": "hard",
+    "est_minutes": 5,
+    "prompt": "A leaves-upward pass on a rooted tree answers the question for the root only. State the two-pass rerooting scheme in general terms, and state the property an aggregate must have for the second pass to be O(1) per edge.",
+    "answer": "Pass one is the ordinary subtree DP: rooted anywhere, compute down[v] from the down values of v's children. Pass two walks the same tree root-downward and computes the answer for each node as if the tree were rooted there. Moving from parent u to child v, the answer for v is the answer for u with v's own subtree contribution removed and the rest of the tree re-attached as a new child of v: up[v] = f(ans[u] minus down[v]'s contribution), and ans[v] = combine(down[v], up[v]). For sum of distances that collapses to ans[v] = ans[u] + n - 2*size[v], because the size[v] nodes below v each get one step closer and the other n - size[v] each get one step further. The property the second pass needs is that the aggregate is invertible: you must be able to take the parent's combined value and subtract out the one child you are descending into, in O(1). Sums, counts and products modulo a prime are invertible. Maximum is not, which is why max-flavoured rerooting stores the best two child values per node instead and, at each child, uses the best one that did not come through that child.",
+    "explanation": "The idea worth carrying out of this is that rerooting is a change of the DP's direction, not a new DP: the same combine function is applied to a different decomposition of the tree at each node. Everything about node v's answer that does not live in v's subtree enters through exactly one edge, the one to its parent, so a single up[v] value captures it and the whole second pass is one downward traversal. The invertibility question is the one that decides the shape of your code before you write it, so ask it first: if the aggregate can be un-combined the transition is a subtraction, and if it cannot, you carry enough per node (usually top two) to answer any single-child exclusion. The same top-two trick is what makes the tree-diameter and maximum-depth-from-every-node problems linear.",
+    "hints": [
+      "Write down what node v's answer is made of, split by which edge each contribution arrives through.",
+      "Ask what you have to do to the parent's value to stop it double-counting the subtree you are about to descend into."
+    ],
+    "refs": [
+      "LC 834 Sum of Distances in Tree",
+      "LC 2538 Difference Between Maximum and Minimum Price Sum",
+      "LC 543 Diameter of Binary Tree"
+    ]
+  },
+  {
+    "id": "tree-dp-max-reroot-choice",
+    "title": "Rerooting a maximum",
+    "kind": "choice",
+    "topic": "tree-dp",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "You want, for every node of a tree, the distance to the node farthest from it. A subtree pass gives down[v], the deepest descent from v. Descending from u to child v you need the deepest walk from u that avoids v's subtree. What makes this O(1) per edge?",
+    "choices": [
+      "Store the two largest values of down[c] + 1 over u's children, along with which child produced the largest; at v use the largest unless it came through v, in which case use the second",
+      "Compute up[v] as up[u] + 1 combined with down[u] - down[v] - 1, subtracting v's contribution the way the sum version does",
+      "Root the tree at each node in turn and take the deepest descent, which is fine because each rerooting is only one pass",
+      "Sort each node's children by down value and binary search for the largest entry that is not v"
+    ],
+    "answer": "Store the two largest values of down[c] + 1 over u's children, along with which child produced the largest; at v use the largest unless it came through v, in which case use the second",
+    "explanation": "A maximum cannot be un-combined: down[u] - down[v] is meaningless, because knowing the best child and the child you are excluding tells you nothing about the second best unless you kept it. Keeping the top two, plus the identity of the top one, is exactly enough to answer 'best over all children except this one' in O(1), and it generalises to 'best except any one' for any comparison-based aggregate. Rerooting from scratch at every node is the O(n^2) approach the whole technique exists to avoid, and sorting the children then searching is O(deg log deg) per node for a query that a constant amount of state already answers. This is the standard shape for tree diameter and for the farthest-node-from-every-node problem, where the answer at v is max(down[v], up[v]).",
+    "refs": [
+      "LC 543 Diameter of Binary Tree",
+      "LC 310 Minimum Height Trees",
+      "LC 2246 Longest Path With Different Adjacent Characters"
+    ]
+  },
+  {
+    "id": "number-theory-inverse-without-fermat",
+    "title": "Dividing when the modulus is not prime",
+    "kind": "recall",
+    "topic": "number-theory",
+    "difficulty": "medium",
+    "est_minutes": 4,
+    "prompt": "You have been dividing mod 10^9 + 7 with a^(p-2). The modulus changes to 2^32, which is not prime. State when a modular inverse exists at all, how to compute it without Fermat, and what to do when it does not exist.",
+    "answer": "An inverse of a mod m exists exactly when gcd(a, m) = 1, and it is unique mod m. Fermat's a^(p-2) is a special case: it works because for prime p every a not divisible by p is coprime to p, and a^(p-1) = 1. The general tool is the extended Euclidean algorithm, which returns x and y with a*x + m*y = gcd(a, m); when the gcd is 1 that reads a*x = 1 mod m, so x mod m is the inverse, computed in O(log m). When gcd(a, m) is not 1 no inverse exists and no amount of algebra creates one, so you avoid the division instead: cancel the shared factor first (a/g and m/g are coprime, which solves the congruence a*x = b mod m whenever g divides b), or keep the factor outside the modulus by tracking the exponent of it separately, or, for binomial coefficients mod a small or composite modulus, use Lucas' theorem or factor the modulus into prime powers and recombine with CRT.",
+    "explanation": "The habit worth building is to ask 'is this modulus prime?' the moment a division appears, because Fermat silently produces a wrong number rather than an error when the answer is not invertible. The most common real case is a modulus like 10^9 (not prime) or a power of two, where exactly the even numbers have no inverse. Extended Euclid is also the faster option even when the modulus is prime: O(log m) with small constants against O(log p) modular multiplications for the exponentiation. The other everyday trick, used in the binomial row drill, is that you often need every inverse in 1..n rather than one, and the recurrence inv[k] = -(m/k) * inv[m%k] fills the whole table in O(n) for prime m.",
+    "hints": [
+      "State the condition on a and m before you reach for an algorithm; some values simply have no inverse.",
+      "Recall what the extended Euclidean algorithm returns beyond the gcd itself, and read that identity modulo m."
+    ],
+    "refs": [
+      "LC 1922 Count Good Numbers",
+      "LC 1735 Count Ways to Make Array With Product",
+      "LC 2954 Count the Number of Infection Sequences"
+    ]
+  },
+  {
+    "id": "number-theory-smallest-prime-factor",
+    "title": "Factorising many numbers at once",
+    "kind": "recall",
+    "topic": "number-theory",
+    "difficulty": "medium",
+    "est_minutes": 4,
+    "prompt": "You must fully factorise 200000 numbers, each up to 10^6. Trial division to sqrt(x) per number is too slow. Describe the table you precompute, how it is built, and how a single factorisation then runs.",
+    "answer": "Precompute spf[x], the smallest prime factor of every x up to N = 10^6. Build it with a sieve: iterate p from 2 to N, and if spf[p] is still unset then p is prime, so walk the multiples p, 2p, 3p, ... and set spf of each to p if it is still unset. That is O(N log log N) time and O(N) memory (an int32 array is 4 MB at 10^6). Factorising x is then a loop: while x > 1, take p = spf[x], count how many times p divides x, and divide it out. Each iteration removes at least one prime factor, so it costs O(log x) per number, which is at most 20 steps here, versus 1000 divisions for trial division. Total is one sieve plus 200000 short loops. The same table gives the divisor count and Euler's totient multiplicatively from the exponents without any extra work, and the linear sieve variant additionally hands you the primes list in order.",
+    "explanation": "The general move here is precompute-per-value instead of compute-per-query, and it is the right instinct whenever the queries share a bounded universe. The choice of smallest prime factor rather than a plain is-prime array is what makes the factorisation loop terminate in log x steps with no searching: the table hands you the next factor directly. Watch the memory bound, since it is what decides whether the approach is available at all: at N = 10^6 an int32 spf table is 4 MB, but at N = 10^9 it is not an option and you are back to trial division by the primes up to 31623 (a sieve of that size, then trial dividing by those primes) or to Pollard's rho for a handful of large numbers. Being able to say which of those three regimes you are in is the answer an interviewer is listening for.",
+    "hints": [
+      "You are answering many queries from one bounded universe, so ask what a single pass over that universe could store.",
+      "Storing 'is x prime' still leaves you searching for a factor. What single number per x would remove the search entirely?"
+    ],
+    "refs": [
+      "LC 952 Largest Component Size by Common Factor",
+      "LC 2521 Distinct Prime Factors of Product of Array",
+      "LC 204 Count Primes"
+    ]
+  },
+  {
+    "id": "geometry-orientation-test",
+    "title": "The cross product as the whole toolkit",
+    "kind": "recall",
+    "topic": "geometry",
+    "difficulty": "medium",
+    "est_minutes": 4,
+    "prompt": "State what the sign of (a-o) x (b-o) tells you, name three lattice-geometry questions it answers directly, and state the overflow bound with coordinates up to 10^9.",
+    "answer": "The two-dimensional cross product (a-o) x (b-o) = (ax-ox)*(by-oy) - (ay-oy)*(bx-ox) is twice the signed area of triangle o, a, b. Positive means o -> a -> b turns counter-clockwise (b is left of the directed line o->a), negative means clockwise, and zero means the three points are collinear. Three things it answers directly: whether a polygon vertex is convex or reflex, which is the pop test in a hull scan; whether two segments properly cross, by checking that each segment's endpoints straddle the other's line, meaning the two orientations have opposite signs; and the area of any simple polygon via the shoelace sum, along with point-in-triangle by checking three orientations agree in sign. Overflow: each difference is up to 2*10^9, each product up to 4*10^18 and the subtraction up to 8*10^18 in the worst case, which is just under the int64 limit of about 9.22*10^18, so 10^9 coordinates are safe in int64 but 10^9 differences of already-shifted coordinates are not; if the inputs are not already centred, subtract a reference point first or use big integers.",
+    "explanation": "Nearly every lattice geometry problem is orientation tests in a trench coat, and keeping everything integral is the point: the cross product needs only subtraction and multiplication, so exact integer arithmetic decides every predicate and there is no epsilon to tune. The moment you compute a slope, a length or an angle you have introduced a division or a square root and with it a tie-breaking problem on collinear points, which is exactly where geometry code goes wrong. Two habits follow: sort by (x, y) rather than by angle when you can, and compare cross products rather than dividing to compare slopes. The overflow arithmetic is worth having memorised because it is the one bug that survives all your tests and then appears on the largest input.",
+    "hints": [
+      "It is twice a signed area. What does the sign of an area tell you about the order the three points are visited in?",
+      "Bound the largest intermediate value, not the answer: two coordinate differences multiplied together."
+    ],
+    "refs": [
+      "LC 587 Erect the Fence",
+      "LC 1266 Minimum Time Visiting All Points",
+      "LC 812 Largest Triangle Area"
+    ]
+  },
+  {
+    "id": "geometry-farthest-pair-choice",
+    "title": "Farthest pair among 200000 points",
+    "kind": "choice",
+    "topic": "geometry",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "Given 200000 lattice points, you need the maximum squared distance between any two of them. Checking all pairs is 2*10^10 comparisons. What is the standard O(n log n) approach and why is it correct?",
+    "choices": [
+      "Take the convex hull, then sweep the hull with rotating calipers, because both endpoints of a farthest pair must be hull vertices",
+      "Take the convex hull, then check all pairs of hull vertices, which is fine because a hull always has O(log n) vertices",
+      "Find the two points farthest apart in x and the two farthest apart in y, and take the better of those two pairs",
+      "Sort by x and check each point against the next 100 points in the order, since a farthest pair is far apart in x"
+    ],
+    "answer": "Take the convex hull, then sweep the hull with rotating calipers, because both endpoints of a farthest pair must be hull vertices",
+    "explanation": "The correctness step is the one to be able to say out loud: if a point p is not a hull vertex it lies inside the hull, so for any other point q there is a hull vertex at least as far from q as p is, which means p is never needed in a farthest pair. That reduces the problem to the hull, and rotating calipers then walks two pointers around it in O(h) total because the farthest vertex from an edge moves monotonically as the edge rotates. The other options fail on the size or the geometry: a hull can have all n vertices (points on a circle or on a parabola), so all-pairs on hull vertices is still quadratic in the worst case; the axis-extreme pair is simply wrong for a diagonal diameter; and a fixed window after sorting by x misses pairs that are far apart in y. The same hull-then-calipers shape gives the width, the minimum enclosing rectangle and the closest pair between two convex polygons.",
+    "refs": [
+      "LC 587 Erect the Fence",
+      "LC 963 Minimum Area Rectangle II",
+      "LC 1924 Erect the Fence II"
+    ]
+  }
+]
