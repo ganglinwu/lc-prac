@@ -131,7 +131,7 @@ func TestDoSyncSaysWhenAlreadyInSync(t *testing.T) {
 	if err := doSync(out, cfg, false); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "already in sync") {
+	if !strings.Contains(out.String(), "nothing new to bring back") {
 		t.Fatalf("got %q", out.String())
 	}
 }

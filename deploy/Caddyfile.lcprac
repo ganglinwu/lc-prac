@@ -1,0 +1,5 @@
+# Append to /etc/caddy/Caddyfile. Caddy provisions the certificate over ACME,
+# so the A record for this name must already point at the box.
+lcprac.guenyanghae.com {
+	reverse_proxy 127.0.0.1:8090
+}

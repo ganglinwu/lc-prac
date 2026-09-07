@@ -1,0 +1,37 @@
+[Unit]
+Description=lcpracd, the lcprac progress sync server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lcpracd
+Group=lcpracd
+ExecStart=/usr/local/bin/lcpracd
+Restart=on-failure
+RestartSec=5
+
+# LCPRAC_SYNC_TOKENS lives here, not in the unit, so the tokens are not
+# world-readable alongside the rest of the service definition.
+EnvironmentFile=/etc/lcpracd/lcpracd.env
+
+# The server only ever listens on loopback; Caddy fronts it with TLS.
+StateDirectory=lcpracd
+StateDirectoryMode=0700
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+
+[Install]
+WantedBy=multi-user.target

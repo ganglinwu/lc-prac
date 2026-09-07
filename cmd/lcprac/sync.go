@@ -85,7 +85,9 @@ func doSync(w io.Writer, cfg synccli.Config, dry bool) error {
 		return err
 	}
 	if !delta.Changed() {
-		fmt.Fprintf(w, "already in sync with %s (%d drills).\n", cfg.URL, merged.Len())
+		// Sync always pushes first, so nothing coming back means the server
+		// now holds this machine's history, not that the call did nothing.
+		fmt.Fprintf(w, "in sync with %s (%d drills); nothing new to bring back.\n", cfg.URL, merged.Len())
 		return nil
 	}
 	printDelta(w, delta)

@@ -471,6 +471,30 @@ LCPRAC_SYNC_TOKENS=ganglin:<token> \
 It listens on loopback only by default, holds one JSON file per account, and
 takes bearer tokens of at least 16 characters compared in constant time.
 
+### Deploying the server
+
+`deploy/deploy.sh` does the whole install over ssh: cross-compile, upload, add a
+system user, install the systemd unit, append a Caddy vhost, and check the
+public health endpoint.
+
+```
+./deploy/deploy.sh ubuntu@<host> lcprac.example
+```
+
+Point the domain's A record at the box first, or Caddy's ACME challenge has
+nothing to answer on. Re-running is safe: `/etc/lcpracd/lcpracd.env` is only
+written when it does not exist, so a redeploy never rotates the token. The
+first run prints the generated token once, and that is the only time it is
+shown; after that read it back with `sudo cat /etc/lcpracd/lcpracd.env`.
+
+To add a second identity, append `,name:token` to `LCPRAC_SYNC_TOKENS` in that
+file and `sudo systemctl restart lcpracd`. Each account gets its own history
+file, so two people on one server never see each other's drills.
+
+The live instance is `https://lcprac.guenyanghae.com`, backed by the Lightsail
+box that also serves `applehealth.guenyanghae.com`; the two share Caddy and
+nothing else.
+
 ## Layout
 
 ```
