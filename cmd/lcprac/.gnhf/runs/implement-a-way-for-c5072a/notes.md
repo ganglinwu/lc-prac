@@ -56,3 +56,22 @@ Objective: see .gnhf/runs/implement-a-way-for-c5072a/prompt.md
 - Refusing plain http to non-loopback hosts in Config.Validate is a real constraint on deployment, not just hygiene: it means the VPS must be reached through the Caddy TLS vhost, never the Lightsail IP or a raw port. Loopback has to stay exempt or the local end-to-end test is impossible.
 - Testing the client against the actual syncsrv.Handler() via httptest, instead of a hand-written stub, caught the whole protocol in one place and made the idempotence test meaningful: three round trips through the real merge code confirm counters do not drift, which a stub would have asserted about nothing.
 - Both halves of sync now exist and are verified end to end with the compiled binaries. What remains for the objective is deployment (systemd unit for lcpracd on 54.169.114.237, a second Caddy vhost, a Route 53 A record for a sync subdomain) and the separate ask of adding more drills to the bank.
+
+### Iteration 4
+
+**Summary:** Deployed the sync server to the Lightsail VPS behind Caddy TLS at https://lcprac.guenyanghae.com and verified a real two-machine sync over the public internet, with the install captured as a reproducible deploy script.
+
+**Changes:**
+- Route 53 A record lcprac.guenyanghae.com -> 54.169.114.237 created in hosted zone Z0538799AASM7SVVJMH1, and a second Caddy vhost on the box reverse-proxying it to 127.0.0.1:8090 with an ACME-provisioned Let's Encrypt certificate.
+- lcpracd running as an enabled systemd service on the VPS under a dedicated non-login lcpracd user, loopback-only, with hardening (ProtectSystem=strict, NoNewPrivileges, PrivateTmp, RestrictAddressFamilies, SystemCallFilter=@system-service) and its history in /var/lib/lcpracd at mode 0700; tokens live in /etc/lcpracd/lcpracd.env at 0640 root:lcpracd, outside the world-readable unit file.
+- deploy/deploy.sh: one-command install over ssh (cross-compile, upload, create user, install unit, generate a token only if none exists, append the Caddy vhost only if absent, then poll the public /healthz until it answers or fail loudly). Verified idempotent by running it twice. Accompanied by deploy/lcpracd.service and deploy/Caddyfile.lcprac.
+- cmd/lcprac/sync.go: the no-delta message changed from 'already in sync' to 'in sync with <url> (N drills); nothing new to bring back', because Sync always pushes first and the old wording implied the call had done nothing when it had in fact uploaded new history. Test assertion updated to match.
+- README.md: a 'Deploying the server' subsection covering the deploy script, the DNS-before-ACME ordering, redeploy-does-not-rotate-the-token, how to add a second account, and the live endpoint.
+- This machine configured against the live server (~/.local/share/lcprac/sync.json) and its real 3-drill history pushed; the scripted test data used during verification was removed from the server first.
+
+**Learnings:**
+- The full client/server round trip works unchanged against real TLS infrastructure: a scripted two-machine handoff (A practises, pushes; fresh B pulls 2 drills and 1 session; both re-sync as no-ops) left A and B with byte-identical progress.json, confirming the max-on-counters merge converges in production and not just in httptest.
+- Caddy's ACME run races the deploy script's own verification: the first https request after adding a vhost failed with a TLS internal error while the certificate was still being issued seconds later. Any deploy check on a brand-new vhost needs a retry loop, not a single curl.
+- `set -e` does not abort on a failing command that sits before the final `&&` in a list, so the original `curl -fsS ... && echo` let a failed public health check exit 0 and print '==> done'. Deploy verification must be written as an explicit if/exit, or a broken deploy reports success.
+- Port 8080 on the box is the apple-health server and 2019 is Caddy's admin API; 8090 was free, so lcpracd's default needed no change. Caddy on that host is a single /etc/caddy/Caddyfile with one vhost block per site, so appending a block plus `systemctl reload caddy` is the whole integration.
+- guenyanghae.com's hosted zone is Z0538799AASM7SVVJMH1; the apex and www are CloudFront aliases and only applehealth (now also lcprac) point at the Lightsail box. New subdomain records propagate to the authoritative NS within seconds, so DNS is not a meaningful wait in this deploy.

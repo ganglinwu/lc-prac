@@ -1,0 +1,151 @@
+[
+  {
+    "id": "unionfind-two-optimisations",
+    "title": "What makes union-find fast",
+    "kind": "recall",
+    "topic": "union-find",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "A DSU with a plain parent array can degrade to a linked list. Name the two optimisations that fix it and what each one does.",
+    "answer": "Path compression: find reparents every node it walks past straight to the root, so the next find on any of them is one hop. Union by rank (or by size): attach the shorter tree under the taller one, so a union never deepens the taller tree.",
+    "explanation": "Either one alone is already a big win; together they give O(alpha(n)) amortised per operation, which is under 5 for any n you will meet. Path compression flattens after the fact, union by rank avoids creating the depth in the first place.",
+    "hints": [
+      "One fixes the damage on the way back out of a find. The other decides which root to keep during a union."
+    ],
+    "refs": [
+      "LC 547 Number of Provinces",
+      "LC 684 Redundant Connection"
+    ]
+  },
+  {
+    "id": "unionfind-vs-traversal",
+    "title": "DSU or BFS",
+    "kind": "choice",
+    "topic": "union-find",
+    "difficulty": "medium",
+    "est_minutes": 2,
+    "prompt": "Edges arrive one at a time and after each one you must answer whether two given nodes are now connected. Which structure fits?",
+    "choices": [
+      "Union-find, because it absorbs a new edge in near-constant time and answers connectivity by comparing roots",
+      "BFS from one node, rerun after each edge",
+      "A precomputed adjacency matrix with transitive closure",
+      "A min-heap keyed by edge weight"
+    ],
+    "answer": "Union-find, because it absorbs a new edge in near-constant time and answers connectivity by comparing roots",
+    "explanation": "The tell is incremental edges plus repeated connectivity queries. BFS gives you the same answer but pays O(V+E) every time, and it is the better choice only when you need the actual path or the component contents, which DSU does not give you. DSU also cannot handle edge removal.",
+    "refs": [
+      "LC 261 Graph Valid Tree",
+      "LC 1319 Number of Operations to Make Network Connected"
+    ]
+  },
+  {
+    "id": "trie-vs-hashset",
+    "title": "Why not just a hash set",
+    "kind": "recall",
+    "topic": "trie",
+    "difficulty": "easy",
+    "est_minutes": 3,
+    "prompt": "A hash set of strings answers 'is this an exact word' in O(L) too. What does a trie give you that the set cannot?",
+    "answer": "Prefix structure: does any word start with this prefix, enumerate every word under a prefix, walk one character at a time and abandon a branch as soon as it dies. A set can only answer about whole keys.",
+    "explanation": "The prefix walk is what makes tries the backing structure for autocomplete, and it is why word-search-on-a-grid uses one: you prune a DFS the moment the path so far is not a prefix of anything. Pay for it in memory, since each node holds a child slot per alphabet symbol.",
+    "hints": [
+      "Think about a query that is not a whole word."
+    ],
+    "refs": [
+      "LC 208 Implement Trie",
+      "LC 212 Word Search II"
+    ]
+  },
+  {
+    "id": "trie-lookup-cost",
+    "title": "Cost of a trie lookup",
+    "kind": "complexity",
+    "topic": "trie",
+    "difficulty": "easy",
+    "est_minutes": 2,
+    "prompt": "A trie holds n words over a fixed alphabet. Searching for one word of length L. Time complexity?",
+    "answer": "O(L)",
+    "explanation": "One hop per character, and each hop is a constant-time index into the child array. The number of stored words does not appear: a trie with a million words costs the same lookup as one with ten, which is the property a hash set matches but a sorted list (O(L log n)) does not.",
+    "hints": [
+      "How many nodes does the search visit, and does n change that?"
+    ],
+    "refs": [
+      "LC 208 Implement Trie"
+    ]
+  },
+  {
+    "id": "topo-kahn-loop",
+    "title": "Kahn's algorithm from memory",
+    "kind": "recall",
+    "topic": "topological-sort",
+    "difficulty": "medium",
+    "est_minutes": 4,
+    "prompt": "Write out the loop of Kahn's algorithm on a directed graph: what you precompute, what seeds the queue, and what happens per pop.",
+    "answer": "Precompute indegree for every node. Seed the queue with every node of indegree 0. Pop a node, append it to the order, and for each outgoing neighbour decrement its indegree, pushing it when the indegree hits 0. Stop when the queue empties.",
+    "explanation": "Indegree is 'how many prerequisites am I still waiting on'. A node is safe to emit exactly when that count reaches zero, and the decrement is the only place the count ever changes. Push on the transition to zero, not on every decrement, or a node with two parents enters the queue twice.",
+    "hints": [
+      "The queue holds nodes with nothing left blocking them.",
+      "Where exactly does a node get pushed, and what guards it against being pushed twice?"
+    ],
+    "refs": [
+      "LC 207 Course Schedule",
+      "LC 210 Course Schedule II"
+    ]
+  },
+  {
+    "id": "topo-cycle-signal",
+    "title": "How Kahn tells you there is a cycle",
+    "kind": "choice",
+    "topic": "topological-sort",
+    "difficulty": "medium",
+    "est_minutes": 2,
+    "prompt": "You ran Kahn's algorithm on a graph of n nodes and the queue emptied. How do you know whether the graph had a cycle?",
+    "choices": [
+      "The order holds fewer than n nodes; the missing ones never reached indegree 0",
+      "The queue held more than one node at some point",
+      "Some node was pushed twice",
+      "You cannot tell; Kahn's needs a separate DFS to detect cycles"
+    ],
+    "answer": "The order holds fewer than n nodes; the missing ones never reached indegree 0",
+    "explanation": "Every node inside a cycle is waiting on another node in that same cycle, so its indegree never falls to zero and it is never emitted. Detection is free: compare the emitted count with n. Multiple nodes in the queue at once just means the order is not unique.",
+    "refs": [
+      "LC 207 Course Schedule",
+      "LC 802 Find Eventual Safe States"
+    ]
+  },
+  {
+    "id": "deque-monotonic-contents",
+    "title": "What the deque holds",
+    "kind": "recall",
+    "topic": "deque",
+    "difficulty": "medium",
+    "est_minutes": 4,
+    "prompt": "Sliding window maximum with a deque. What is stored, in what order, and what are the two conditions that remove something?",
+    "answer": "Indices, in decreasing order of their values, front to back. Pop from the back while the new value is greater than or equal to the value at the back, because those can never be a maximum again. Pop from the front when its index has slid out of the window (front <= i-k). The front is then the window's maximum.",
+    "explanation": "Store indices, not values, or you have no way to tell that the front has expired. The back eviction is the actual insight: once a bigger element arrives later, everything smaller behind it is dead for every future window, so the deque only ever holds the candidates that could still win.",
+    "hints": [
+      "Two different reasons an element leaves, and they leave from different ends.",
+      "Why indices rather than the values themselves?"
+    ],
+    "refs": [
+      "LC 239 Sliding Window Maximum"
+    ]
+  },
+  {
+    "id": "deque-amortized-cost",
+    "title": "Cost of the monotonic deque scan",
+    "kind": "complexity",
+    "topic": "deque",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "Sliding window maximum over n elements with a monotonic deque, window size k. There is a while loop inside the for loop. Time complexity?",
+    "answer": "O(n)",
+    "explanation": "The inner while looks like it should multiply, but each index is pushed exactly once and popped at most once across the entire run, so the total pop work is bounded by n rather than by n*k. This is the same amortised argument as a monotonic stack. The heap alternative is O(n log n), so the deque is the reason to bother.",
+    "hints": [
+      "Do not count the inner loop per iteration. Count how many times any single index can be removed."
+    ],
+    "refs": [
+      "LC 239 Sliding Window Maximum"
+    ]
+  }
+]
