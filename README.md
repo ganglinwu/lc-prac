@@ -38,6 +38,7 @@ go run ./cmd/lcprac note <id> <words>    # keep your own wording on a drill
 go run ./cmd/lcprac add                  # write a drill of your own, one prompt at a time
 go run ./cmd/lcprac add -problem 261     # ... for one real problem, refs and topic prefilled
 go run ./cmd/lcprac mine                 # your own drills and where they live
+go run ./cmd/lcprac sync                 # carry your history to and from your own server
 ```
 
 Install it as a real binary with `go install ./cmd/lcprac`.
@@ -432,6 +433,44 @@ file from your solution, so an `import` in the preamble does not cover the
 solution. Either the user writes the import themselves, or the preamble exposes
 a helper that hides it (which is what the intervals drill does with `sort`).
 
+## Practising on more than one machine
+
+The laptop and the desktop each keep their own `progress.json`, so without help
+they drift: two half-streaks and two sets of leeches. `lcprac sync` fixes that
+against a server you run yourself.
+
+```
+lcprac sync -set-url https://lcprac.example -set-token <token>
+lcprac sync          # push what this machine did, merge back what the others did
+lcprac sync -n       # ... but only say what would come back
+lcprac sync -status  # where this machine syncs to (the token is not printed)
+```
+
+A sync is one round trip: this machine's whole history goes up, the server
+folds it into its copy, and the merged result comes back and is written here.
+The merge is symmetric and takes the larger value on every counter, so syncing
+twice in a row changes nothing the second time and a re-synced sitting cannot
+inflate your accuracy. Per-drill schedules come from whichever machine saw the
+drill last; sessions and problem attempts are timestamped events, so they are
+unioned rather than reconciled.
+
+The config lives in `sync.json` next to the history, mode 0600 because it holds
+the token. `LCPRAC_SYNC_URL` and `LCPRAC_SYNC_TOKEN` override it for a one-off.
+Plain `http` is refused unless the host is loopback, so the token cannot go out
+in the clear.
+
+The server is `cmd/lcpracd`, meant to sit behind a TLS reverse proxy:
+
+```
+LCPRAC_SYNC_ADDR=127.0.0.1:8090 \
+LCPRAC_SYNC_DATA=/var/lib/lcprac \
+LCPRAC_SYNC_TOKENS=ganglin:<token> \
+  lcpracd
+```
+
+It listens on loopback only by default, holds one JSON file per account, and
+takes bearer tokens of at least 16 characters compared in constant time.
+
 ## Layout
 
 ```
@@ -441,4 +480,7 @@ internal/session  picking drills that fit a time budget
 internal/runner   the interactive prompt/answer/grade loop
 internal/codecheck compiles a code drill's answer and runs its tests
 internal/progress recorded history and the spaced-repetition schedule
+internal/synccli  this machine's side of sync: config, push, merge back
+internal/syncsrv  the server's side: one canonical history per account
+cmd/lcpracd       the daemon that hosts internal/syncsrv
 ```

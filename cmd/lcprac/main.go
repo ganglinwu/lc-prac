@@ -51,6 +51,8 @@ func run(args []string) error {
 		return cmdProblems(args)
 	case "attempt":
 		return cmdAttempt(args)
+	case "sync":
+		return cmdSync(args)
 	case "help", "-h", "--help":
 		usage()
 		return nil
@@ -110,6 +112,11 @@ func usage() {
       -problem carries a real problem into the new drill's refs and defaults
       its title and topic from it, so a gap lcprac problems named can be
       covered by number, e.g. -problem 261.
+  lcprac sync [-n] [-status] [-set-url URL] [-set-token TOKEN]
+      Carry your history to and from your own sync server, so the laptop and
+      the desktop share one streak. A sync pushes what this machine has and
+      merges back what the others did; running it twice changes nothing the
+      second time. -n shows what would come back without writing it.
   lcprac mine [-init]
       Show where your own drill files live and what they add. -init writes a
       commented example you can copy.
