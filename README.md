@@ -470,6 +470,18 @@ inflate your accuracy. Per-drill schedules come from whichever machine saw the
 drill last; sessions and problem attempts are timestamped events, so they are
 unioned rather than reconciled.
 
+The drills you wrote yourself travel too, as a second document on the same
+server. A drill added on the laptop shows up in the desktop's deck on its next
+sync, so a sitting there can actually ask it rather than only carrying a history
+record for an id that machine cannot render. Drills merge by id with the later
+edit winning, and `lcprac add` stamps `updated_at` for exactly that comparison.
+An edit is written back into whichever of your files already held the drill, so
+a directory you organised by hand stays organised; drills that are new to this
+machine land in `drills/synced.json`. Two caveats: a drill you edit by hand in a
+JSON file keeps its old `updated_at` and so loses to any stamped copy elsewhere,
+and only your own drills sync, since the builtin bank is compiled into the
+binary and travels by rebuilding it.
+
 The config lives in `sync.json` next to the history, mode 0600 because it holds
 the token. `LCPRAC_SYNC_URL` and `LCPRAC_SYNC_TOKEN` override it for a one-off.
 Plain `http` is refused unless the host is loopback, so the token cannot go out
@@ -484,8 +496,11 @@ LCPRAC_SYNC_TOKENS=ganglin:<token> \
   lcpracd
 ```
 
-It listens on loopback only by default, holds one JSON file per account, and
-takes bearer tokens of at least 16 characters compared in constant time.
+It listens on loopback only by default, holds two JSON files per account
+(`<account>.json` for history, `<account>.drills.json` for your own drills), and
+takes bearer tokens of at least 16 characters compared in constant time. An
+uploaded drill is validated before it is stored, so a broken drill cannot be
+pushed to a machine that would then fail to load its deck.
 
 ### Deploying the server
 

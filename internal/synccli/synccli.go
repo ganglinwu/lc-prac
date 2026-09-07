@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ganglinwu/lc-prac/internal/drill"
 	"github.com/ganglinwu/lc-prac/internal/progress"
 )
 
@@ -140,28 +141,45 @@ func NewAutoClient(c Config) *Client {
 	return &Client{Config: c, HTTP: &http.Client{Timeout: AutoTimeout}}
 }
 
-// endpoint is the sync route on the configured server.
-func (c *Client) endpoint() string {
-	return strings.TrimRight(c.Config.URL, "/") + "/v1/sync"
+// The two synced documents: counters, and the drills you wrote yourself.
+const (
+	historyPath = "/v1/sync"
+	drillsPath  = "/v1/drills"
+)
+
+// endpoint is one of the sync routes on the configured server.
+func (c *Client) endpoint(path string) string {
+	return strings.TrimRight(c.Config.URL, "/") + path
 }
 
 // Push sends this machine's history and returns the server's merge of it,
 // which is the whole protocol: one round trip converges both sides.
 func (c *Client) Push(body []byte) ([]byte, error) {
-	return c.do(http.MethodPost, bytes.NewReader(body))
+	return c.do(http.MethodPost, historyPath, bytes.NewReader(body))
 }
 
 // Pull fetches the server's copy without sending anything, for a fresh machine
 // that has nothing worth pushing yet.
 func (c *Client) Pull() ([]byte, error) {
-	return c.do(http.MethodGet, nil)
+	return c.do(http.MethodGet, historyPath, nil)
 }
 
-func (c *Client) do(method string, body io.Reader) ([]byte, error) {
+// PushDrills sends the drills this machine holds and returns the merge, the
+// same one-round-trip shape as Push.
+func (c *Client) PushDrills(body []byte) ([]byte, error) {
+	return c.do(http.MethodPost, drillsPath, bytes.NewReader(body))
+}
+
+// PullDrills fetches the server's drills without sending any.
+func (c *Client) PullDrills() ([]byte, error) {
+	return c.do(http.MethodGet, drillsPath, nil)
+}
+
+func (c *Client) do(method, path string, body io.Reader) ([]byte, error) {
 	if err := c.Config.Validate(); err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(method, c.endpoint(), body)
+	req, err := http.NewRequest(method, c.endpoint(path), body)
 	if err != nil {
 		return nil, err
 	}
@@ -208,11 +226,16 @@ type Delta struct {
 	UpdatedDrills int
 	NewSessions   int
 	NewAttempts   int
+	// NewWritten and UpdatedWritten count the drills you wrote yourself, which
+	// travel as text rather than as counters.
+	NewWritten     int
+	UpdatedWritten int
 }
 
 // Changed reports whether the merge actually moved anything.
 func (d Delta) Changed() bool {
-	return d.NewDrills+d.UpdatedDrills+d.NewSessions+d.NewAttempts > 0
+	return d.NewDrills+d.UpdatedDrills+d.NewSessions+d.NewAttempts+
+		d.NewWritten+d.UpdatedWritten > 0
 }
 
 // DiffStores describes what merged holds that local did not.
@@ -277,4 +300,50 @@ func Sync(c *Client, local *progress.Store) (*progress.Store, Delta, error) {
 	}
 	merged := local.Merge(remote)
 	return merged, DiffStores(local, merged), nil
+}
+
+// SyncDrills carries the drills you wrote yourself to the server and back, so
+// a drill written on the laptop can be practised on the desktop. Nothing is
+// written to dir unless apply is set, which is what makes a dry run possible.
+func SyncDrills(c *Client, dir string, apply bool) (newer, updated int, err error) {
+	local, err := drill.LoadUserDir(dir)
+	if err != nil {
+		return 0, 0, err
+	}
+	body, err := drill.EncodeDrills(local)
+	if err != nil {
+		return 0, 0, err
+	}
+	out, err := c.PushDrills(body)
+	if err != nil {
+		return 0, 0, err
+	}
+	remote, err := drill.DecodeDrills(out)
+	if err != nil {
+		return 0, 0, fmt.Errorf("sync: server returned unreadable drills: %w", err)
+	}
+	merged := drill.MergeDrills(local, remote)
+	if !apply {
+		n, u := DiffDrills(local, merged)
+		return n, u, nil
+	}
+	return drill.ApplyMerged(dir, merged)
+}
+
+// DiffDrills counts what merged holds that this machine's drills did not.
+func DiffDrills(local, merged []drill.Drill) (newer, updated int) {
+	have := make(map[string]drill.Drill, len(local))
+	for _, d := range local {
+		have[d.ID] = d
+	}
+	for _, m := range merged {
+		old, ok := have[m.ID]
+		switch {
+		case !ok:
+			newer++
+		case !drill.SameDrill(old, m):
+			updated++
+		}
+	}
+	return newer, updated
 }

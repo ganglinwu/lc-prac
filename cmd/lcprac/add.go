@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ganglinwu/lc-prac/internal/drill"
 	"github.com/ganglinwu/lc-prac/internal/progress"
@@ -129,6 +130,10 @@ func addDrill(in io.Reader, out io.Writer, deck *drill.Set, path string, pre pro
 	if err := d.Validate(); err != nil {
 		return err
 	}
+	// Stamped so a later edit on another machine can be told apart from this
+	// one when the two are synced.
+	now := time.Now().UTC()
+	d.UpdatedAt = &now
 
 	fmt.Fprintln(out)
 	writeReview(out, d, progress.Record{}, false)

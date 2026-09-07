@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ganglinwu/lc-prac/internal/drill"
 	"github.com/ganglinwu/lc-prac/internal/progress"
 	"github.com/ganglinwu/lc-prac/internal/synccli"
 	"github.com/ganglinwu/lc-prac/internal/syncsrv"
@@ -331,5 +333,103 @@ func TestStatusReportsAutoState(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "off around drill sessions") {
 		t.Fatalf("status should report auto is off, got %q", out.String())
+	}
+}
+
+// writeOwnDrill puts a drill in this machine's drills directory, standing in
+// for `lcprac add`.
+func writeOwnDrill(t *testing.T, id, prompt string, stamp time.Time) {
+	t.Helper()
+	dir, err := drill.UserDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	d := drill.Drill{
+		ID: id, Title: "t " + id, Kind: drill.KindRecall, Topic: "arrays",
+		Difficulty: drill.Easy, EstMinutes: 2, Prompt: prompt,
+		Answer: "a", Explanation: "e", UpdatedAt: &stamp,
+	}
+	b, err := json.MarshalIndent([]drill.Drill{d}, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "mine.json"), append(b, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A drill written on one machine has to be practisable on the other, not just
+// present in its progress history.
+func TestSyncCarriesYourOwnDrillsToAnotherMachine(t *testing.T) {
+	_, url := syncHome(t)
+	stamp := time.Now().UTC().Truncate(time.Second)
+	writeOwnDrill(t, "my-own-drill", "why is a deque needed here", stamp)
+	if err := cmdSync([]string{"-set-url", url, "-set-token", cliToken}); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdSync(nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// A second machine: same server, empty home.
+	second := t.TempDir()
+	t.Setenv("LCPRAC_HOME", second)
+	if err := cmdSync([]string{"-set-url", url, "-set-token", cliToken}); err != nil {
+		t.Fatal(err)
+	}
+	out := &bytes.Buffer{}
+	cfg, err := synccli.LoadConfig(filepath.Join(second, "sync.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := doSync(out, cfg, false); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "1 drill(s) you wrote on another machine") {
+		t.Fatalf("output did not report the pulled drill:\n%s", out)
+	}
+	deck, _, err := drill.Combined()
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, ok := deck.ByID("my-own-drill")
+	if !ok {
+		t.Fatal("the pulled drill is not in the second machine's deck")
+	}
+	if d.Prompt != "why is a deque needed here" {
+		t.Fatalf("pulled drill prompt = %q", d.Prompt)
+	}
+}
+
+// The dry run must report what would arrive without putting it on disk.
+func TestSyncDryRunDoesNotWriteOwnDrills(t *testing.T) {
+	_, url := syncHome(t)
+	writeOwnDrill(t, "shared-drill", "p", time.Now().UTC().Truncate(time.Second))
+	if err := cmdSync([]string{"-set-url", url, "-set-token", cliToken}); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdSync(nil); err != nil {
+		t.Fatal(err)
+	}
+
+	second := t.TempDir()
+	t.Setenv("LCPRAC_HOME", second)
+	cfg := synccli.Config{URL: url, Token: cliToken}
+	out := &bytes.Buffer{}
+	if err := doSync(out, cfg, true); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "nothing was written") {
+		t.Fatalf("dry run output:\n%s", out)
+	}
+	dir, err := drill.UserDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ds, err := drill.LoadUserDir(dir); err != nil || len(ds) != 0 {
+		t.Fatalf("dry run left %d drills on disk (%v)", len(ds), err)
 	}
 }

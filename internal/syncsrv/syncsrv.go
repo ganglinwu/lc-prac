@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ganglinwu/lc-prac/internal/drill"
 	"github.com/ganglinwu/lc-prac/internal/progress"
 )
 
@@ -78,10 +79,71 @@ func (s *Server) Handler() http.Handler {
 		fmt.Fprintln(w, "ok")
 	})
 	mux.HandleFunc("/v1/sync", s.handleSync)
+	mux.HandleFunc("/v1/drills", s.handleDrills)
 	return mux
 }
 
 func (s *Server) handleSync(w http.ResponseWriter, r *http.Request) {
+	s.serve(w, r, historyDoc)
+}
+
+// handleDrills carries the drills you wrote yourself. It is a separate
+// document from the history because progress is a fold of counters while a
+// drill is a whole edited text, so the two need different merge rules.
+func (s *Server) handleDrills(w http.ResponseWriter, r *http.Request) {
+	s.serve(w, r, drillsDoc)
+}
+
+// doc is one synced document: where it is stored and how two copies of it are
+// combined. Everything else about a sync is the same for both.
+type doc struct {
+	suffix string
+	// empty is what an account that has never pushed gets back, and it has to
+	// parse as this document's own shape: a history is an object, a drill set
+	// is an array.
+	empty []byte
+	merge func(stored, client []byte) ([]byte, error)
+}
+
+var historyDoc = doc{suffix: ".json", empty: []byte("{}\n"), merge: mergeHistory}
+
+var drillsDoc = doc{suffix: ".drills.json", empty: []byte("[]\n"), merge: mergeDrills}
+
+// mergeHistory folds a machine's counters into the stored ones. The path is
+// empty because the caller writes the bytes, so the store cannot save itself
+// over the wrong file.
+func mergeHistory(stored, client []byte) ([]byte, error) {
+	theirs, err := progress.Decode("", client)
+	if err != nil {
+		return nil, badRequest{"history is not valid lcprac JSON"}
+	}
+	ours, err := progress.Decode("", stored)
+	if err != nil {
+		return nil, fmt.Errorf("stored history is corrupt: %w", err)
+	}
+	return ours.Merge(theirs).Encode()
+}
+
+// mergeDrills unions the two drill sets, newest edit per id winning.
+func mergeDrills(stored, client []byte) ([]byte, error) {
+	theirs, err := drill.DecodeDrills(client)
+	if err != nil {
+		return nil, badRequest{"drills are not valid lcprac drills: " + err.Error()}
+	}
+	ours, err := drill.DecodeDrills(stored)
+	if err != nil {
+		return nil, fmt.Errorf("stored drills are corrupt: %w", err)
+	}
+	return drill.EncodeDrills(drill.MergeDrills(ours, theirs))
+}
+
+// badRequest marks a merge failure the client caused, so it comes back as a
+// 400 naming the problem rather than as a 500.
+type badRequest struct{ msg string }
+
+func (e badRequest) Error() string { return e.msg }
+
+func (s *Server) serve(w http.ResponseWriter, r *http.Request, d doc) {
 	acct, ok := s.authenticate(r)
 	if !ok {
 		w.Header().Set("WWW-Authenticate", `Bearer realm="lcprac"`)
@@ -90,9 +152,9 @@ func (s *Server) handleSync(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodGet:
-		s.handleGet(w, acct)
+		s.handleGet(w, acct, d)
 	case http.MethodPost:
-		s.handlePost(w, r, acct)
+		s.handlePost(w, r, acct, d)
 	default:
 		w.Header().Set("Allow", "GET, POST")
 		httpError(w, http.StatusMethodNotAllowed, "use GET or POST")
@@ -116,73 +178,89 @@ func (s *Server) authenticate(r *http.Request) (string, bool) {
 	return match, match != ""
 }
 
-func (s *Server) handleGet(w http.ResponseWriter, acct string) {
+func (s *Server) handleGet(w http.ResponseWriter, acct string, d doc) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	b, err := s.read(acct)
+	b, err := s.read(acct, d)
 	if err != nil {
-		httpError(w, http.StatusInternalServerError, "reading history")
+		httpError(w, http.StatusInternalServerError, "reading stored copy")
 		return
 	}
-	writeJSON(w, b)
+	writeJSON(w, b, d.empty)
 }
 
-func (s *Server) handlePost(w http.ResponseWriter, r *http.Request, acct string) {
+func (s *Server) handlePost(w http.ResponseWriter, r *http.Request, acct string, d doc) {
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBody))
 	if err != nil {
-		httpError(w, http.StatusRequestEntityTooLarge, "history too large")
-		return
-	}
-	client, err := progress.Decode("", body)
-	if err != nil {
-		httpError(w, http.StatusBadRequest, "history is not valid lcprac JSON")
+		httpError(w, http.StatusRequestEntityTooLarge, "upload too large")
 		return
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	stored, err := s.read(acct)
+	stored, err := s.read(acct, d)
 	if err != nil {
-		httpError(w, http.StatusInternalServerError, "reading history")
+		httpError(w, http.StatusInternalServerError, "reading stored copy")
 		return
 	}
-	server, err := progress.Decode(s.file(acct), stored)
+	merged, err := d.merge(stored, body)
 	if err != nil {
-		httpError(w, http.StatusInternalServerError, "stored history is corrupt")
+		var bad badRequest
+		if errors.As(err, &bad) {
+			httpError(w, http.StatusBadRequest, bad.msg)
+			return
+		}
+		httpError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	merged := server.Merge(client)
-	if err := merged.Save(); err != nil {
-		httpError(w, http.StatusInternalServerError, "writing history")
+	if err := s.write(acct, d, merged); err != nil {
+		httpError(w, http.StatusInternalServerError, "writing stored copy")
 		return
 	}
-	out, err := merged.Encode()
+	writeJSON(w, merged, d.empty)
+}
+
+// write replaces an account's document through a temp file, so a crash
+// mid-write cannot leave a truncated copy as the canonical one.
+func (s *Server) write(acct string, d doc, b []byte) error {
+	path := s.file(acct, d)
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".lcpracd-*")
 	if err != nil {
-		httpError(w, http.StatusInternalServerError, "encoding history")
-		return
+		return err
 	}
-	writeJSON(w, out)
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.Write(b); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(tmp.Name(), 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), path)
 }
 
 // file is where an account's history lives. Account names are validated in
 // New, so this cannot point outside the data directory.
-func (s *Server) file(acct string) string {
-	return filepath.Join(s.path, acct+".json")
+func (s *Server) file(acct string, d doc) string {
+	return filepath.Join(s.path, acct+d.suffix)
 }
 
 // read returns the stored bytes, treating a missing file as no history yet.
-func (s *Server) read(acct string) ([]byte, error) {
-	b, err := os.ReadFile(s.file(acct))
+func (s *Server) read(acct string, d doc) ([]byte, error) {
+	b, err := os.ReadFile(s.file(acct, d))
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
 	return b, err
 }
 
-func writeJSON(w http.ResponseWriter, b []byte) {
+func writeJSON(w http.ResponseWriter, b, empty []byte) {
 	w.Header().Set("Content-Type", "application/json")
 	if len(b) == 0 {
-		b = []byte("{}\n")
+		b = empty
 	}
 	w.Write(b)
 }

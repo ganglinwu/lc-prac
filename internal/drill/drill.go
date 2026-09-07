@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 )
 
 // Kind is the shape of a drill, which determines how the CLI presents it and
@@ -65,6 +66,10 @@ type Drill struct {
 	Hints []string  `json:"hints,omitempty"`
 	Refs  []string  `json:"refs,omitempty"`
 	Code  *CodeSpec `json:"code,omitempty"`
+	// UpdatedAt stamps your own drills so cross-machine sync can tell which
+	// copy is the later edit. Builtin drills leave it nil; so do drills you
+	// wrote before stamping existed, which makes them lose to any newer copy.
+	UpdatedAt *time.Time `json:"updated_at,omitempty"`
 	// Source is where the drill was loaded from, filled in by the loader
 	// rather than by the file itself.
 	Source string `json:"-"`

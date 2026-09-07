@@ -117,7 +117,7 @@ func TestPullFetchesWithoutPushing(t *testing.T) {
 
 func TestClientTrimsTrailingSlash(t *testing.T) {
 	c := NewClient(Config{URL: "https://host/", Token: testToken})
-	if got := c.endpoint(); got != "https://host/v1/sync" {
+	if got := c.endpoint(historyPath); got != "https://host/v1/sync" {
 		t.Fatalf("endpoint = %q", got)
 	}
 }
