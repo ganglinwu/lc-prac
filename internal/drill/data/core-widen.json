@@ -1,0 +1,126 @@
+[
+  {
+    "id": "sqrt-decomposition-when-to-block",
+    "title": "When a block decomposition is the answer",
+    "kind": "recall",
+    "topic": "sqrt-decomposition",
+    "difficulty": "hard",
+    "est_minutes": 5,
+    "prompt": "You have n values and q range queries. Say what makes a problem a sqrt-decomposition problem rather than a segment tree problem, give the two shapes sqrt decomposition takes, and say where the block width comes from in each.",
+    "answer": "A segment tree needs the statistic to be a monoid: two adjacent ranges' answers must combine into their union's answer with no extra information. Sqrt decomposition needs strictly less. The static block form needs only that a whole block's precomputed summary can be merged with at most two partial blocks scanned element by element, so a query costs O(sqrt(n)) and an update costs O(1) plus a block rebuild. The offline form, Mo's algorithm, needs only that the answer for a window can be updated in O(1) when either endpoint moves by one, which is much weaker than combinability: distinct counts, mode, and 'how many values occur exactly twice' all have cheap add and remove but no merge. The block width comes from balancing the two costs. For the static form, a query touches n/B whole blocks and up to 2B loose elements, minimised at B = sqrt(n). For Mo's, the left pointer moves at most B per query for q*B total and the right pointer sweeps at most n per block for n^2/B total, minimised at B = n/sqrt(q), which is sqrt(n) when q is about n. Mo's needs the queries up front and forbids updates between them, which is the price for the weaker requirement.",
+    "explanation": "The useful way to hold this is as a ladder of requirements. Prefix sums need an invertible group operation, so you can subtract. A segment tree needs an associative merge, so you can combine. Mo's needs only an incremental delta, so you can step. Each rung down buys you more problems and costs you a factor: O(1) queries, then O(log n), then O(sqrt(n)) amortised and offline only. Recognising which rung a statistic sits on is most of the work: distinct-count and mode are the standard examples of statistics that fall off the segment tree rung, because two halves' distinct counts say nothing about their union. In an interview the block form is also the fast thing to reach for under time pressure even when a segment tree would work, since it is twenty lines and hard to get wrong, and sqrt(200000) is about 450 which is usually fast enough.",
+    "hints": [
+      "What must be true of a statistic before a segment tree can hold it? Which common statistics fail that test?",
+      "Write the cost of one query as a function of the block width B, then minimise it."
+    ],
+    "refs": [
+      "SPOJ DQUERY D-query",
+      "LC 307 Range Sum Query - Mutable",
+      "CF Blog: sqrt decomposition"
+    ]
+  },
+  {
+    "id": "sqrt-decomposition-mo-updates-choice",
+    "title": "A query mix Mo's cannot take",
+    "kind": "choice",
+    "topic": "sqrt-decomposition",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "You have a Mo's algorithm answering range-distinct queries offline in O((n + q) * sqrt(n)). The problem is then changed: the queries arrive interleaved with point updates that change a single value, and each query must be answered before the next one arrives. What breaks and what do you do?",
+    "choices": [
+      "Both properties Mo's relies on are gone (reordering and offline), so switch to a structure that answers online, or to Mo's with updates if the input can still be read ahead",
+      "Nothing breaks: apply each update to the count array as you reach it while the window is being moved",
+      "Sort the updates into the query order by timestamp and keep the same two pointers",
+      "Increase the block width to n^(2/3) and keep everything else as it is"
+    ],
+    "answer": "Both properties Mo's relies on are gone (reordering and offline), so switch to a structure that answers online, or to Mo's with updates if the input can still be read ahead",
+    "explanation": "Mo's buys its speed by answering the queries in an order of its own choosing, which requires knowing all of them up front and requires that the array does not change underneath the window. Forcing an answer before the next input arrives kills the reordering, and that is fatal on its own regardless of the updates. If the updates are the only new thing and you may still read the whole input first, Mo's with updates exists: the state becomes (l, r, t) where t is how many updates have been applied, blocks are taken on l and r with width n^(2/3), and the cost becomes O(n^(5/3)). That is the setting where the third and fourth options are almost right, and neither is a fix on its own: applying updates as you pass them is not well defined when the window is walking backwards through time, and changing the block width without adding the time dimension changes only the constant. Truly online distinct-count with updates is much harder and is usually attacked with a BIT over last-occurrence positions plus a rebuild, or by accepting a different statistic.",
+    "refs": [
+      "CF Blog: Mo's algorithm with updates",
+      "SPOJ DQUERY D-query"
+    ]
+  },
+  {
+    "id": "bipartite-matching-augmenting-path",
+    "title": "Why augmenting paths are enough",
+    "kind": "recall",
+    "topic": "bipartite-matching",
+    "difficulty": "hard",
+    "est_minutes": 5,
+    "prompt": "Define an augmenting path for a matching, state the theorem that makes it the whole algorithm, and say why a left vertex that fails to augment never has to be retried later.",
+    "answer": "An augmenting path is a path whose edges alternate between not-in-the-matching and in-the-matching, starting and ending at unmatched vertices. Because it starts and ends outside the matching, it has one more unmatched edge than matched edge, so flipping the membership of every edge on it yields a valid matching one larger. Berge's theorem is the converse and is the reason the algorithm terminates correctly: a matching is maximum if and only if it admits no augmenting path. The proof is the symmetric difference of your matching M and a maximum matching M*, which is a disjoint union of paths and even cycles because every vertex has degree at most two in it; if |M*| > |M| some component must have more M* edges than M edges, and such a component is exactly an augmenting path for M. The no-retry property is a separate lemma: if no augmenting path starts at u now, none ever will after augmenting from some other vertex, since later augmentations only ever match more vertices and the set of vertices reachable from u by alternating paths cannot grow. That is what makes Kuhn's a single loop over the left vertices rather than a repeat-until-stable loop, and it is why the running time is O(V*E) rather than unbounded.",
+    "explanation": "It is worth seeing this as max-flow with the machinery removed. Add a source into every left vertex and a sink out of every right vertex with unit capacities; an augmenting path in the matching sense is precisely an augmenting path in the residual graph, and the alternation is the residual's back edges. That view is what tells you the answer is an integer and that the max-flow min-cut theorem specialises to Koenig's theorem, maximum matching equals minimum vertex cover on a bipartite graph. It also tells you where Kuhn's stops being enough: capacities other than one, costs on edges (which is assignment / Hungarian, or min-cost max-flow), and non-bipartite graphs, where alternating paths can close into odd cycles and you need Edmonds' blossom contraction. In an interview the reduction is usually the hard half, since the matching itself is rarely phrased as a matching: tasks to workers, bikes to people, rows to columns.",
+    "hints": [
+      "Count the two kinds of edges on a path whose endpoints are both unmatched. Which kind is there more of?",
+      "Take the symmetric difference of your matching with a larger one. What do its connected components look like?"
+    ],
+    "refs": [
+      "Berge's theorem",
+      "Koenig's theorem",
+      "LC 2172 Maximum AND Sum of Array"
+    ]
+  },
+  {
+    "id": "bipartite-matching-hall-choice",
+    "title": "Proving a perfect matching is impossible",
+    "kind": "choice",
+    "topic": "bipartite-matching",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "Your matching code reports 47 on a graph with 50 left vertices and 60 right vertices, and you are asked to justify the answer to someone who does not trust the implementation. What is the cheapest certificate that 50 is impossible?",
+    "choices": [
+      "A set S of left vertices whose combined neighbourhood is smaller than S, which by Hall's theorem rules out matching all of S",
+      "The matching itself, since a maximum matching is self-evidently maximum",
+      "A run of the algorithm from a different starting order that produces the same 47",
+      "The three unmatched left vertices, since each of them was tried and failed"
+    ],
+    "answer": "A set S of left vertices whose combined neighbourhood is smaller than S, which by Hall's theorem rules out matching all of S",
+    "explanation": "Hall's condition says every left set can be matched if and only if no left set S has |N(S)| < |S|, and the violating set is a certificate anyone can check in a single pass with no trust in your code: count the distinct neighbours of S and compare. You can read one straight out of the algorithm's final state, which is the useful part. Take the unmatched left vertices and everything reachable from them by alternating paths; that left set has its whole neighbourhood matched into the left set itself, so it is deficient by exactly the number of unmatched left vertices it contains. The same set is where Koenig's minimum vertex cover comes from. Rerunning in a different order proves nothing (both runs could share a bug), the matching alone proves only the lower bound 47, and 'each was tried and failed' is a statement about your search rather than about the graph.",
+    "refs": [
+      "Hall's marriage theorem",
+      "Koenig's theorem"
+    ]
+  },
+  {
+    "id": "randomized-shuffle-and-selection",
+    "title": "Fisher-Yates and the biased shuffle",
+    "kind": "recall",
+    "topic": "randomized",
+    "difficulty": "medium",
+    "est_minutes": 5,
+    "prompt": "Write out the Fisher-Yates shuffle, say precisely what goes wrong in the version that swaps position i with a uniformly random position in the whole array, and give the counting argument that shows it is biased for n = 3.",
+    "answer": "Fisher-Yates walks i from n-1 down to 1 (or 0 up to n-2) and swaps a[i] with a[j] for j drawn uniformly from the positions not yet fixed, that is j in [0, i]. The invariant is that after step i the suffix holds a uniformly random subset in uniformly random order, and the induction is that element i lands in each remaining slot with probability 1/(i+1). The broken version draws j from [0, n-1] every time, ignoring which positions are already settled. The counting argument: it makes n independent draws of n values, so it has n^n equally likely execution paths, but there are only n! permutations. For n = 3 that is 27 paths over 6 permutations, and 6 does not divide 27, so the permutations cannot possibly be equiprobable no matter how the paths map onto them. Running it shows the identity permutation and its neighbours coming up 4/27 while others come up 5/27. The same argument condemns 'sort by a random key' when the keys can collide, and 'repeatedly swap two random positions k times', which is only asymptotically uniform.",
+    "explanation": "The n^n versus n! divisibility argument is the thing to carry away, because it settles the question without simulating anything and it generalises: any algorithm whose number of equally likely execution paths is not a multiple of the number of outcomes cannot be uniform over them. The partner fact is that the correct shuffle gives you uniform selection for free: shuffling and taking the first k is a uniform k-subset, which is exactly what the reservoir does in O(k) space instead of O(n). Quickselect is the third member of this family, choosing a random pivot to get O(n) expected selection where a random pivot's expected recursion depth argument, not a worst-case bound, is what carries it. Worth naming out loud in an interview: these are Las Vegas algorithms, always correct with random running time, as opposed to Monte Carlo ones like Miller-Rabin that have fixed running time and a small error probability.",
+    "hints": [
+      "How many equally likely execution paths does the broken version have, and how many permutations is it choosing among?",
+      "State the invariant that has to hold after the loop has fixed the last i positions."
+    ],
+    "refs": [
+      "LC 384 Shuffle an Array",
+      "Fisher-Yates / Knuth shuffle",
+      "LC 215 Kth Largest Element in an Array"
+    ]
+  },
+  {
+    "id": "randomized-quickselect-choice",
+    "title": "Selecting the kth smallest",
+    "kind": "choice",
+    "topic": "randomized",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "You need the kth smallest of n = 10^7 values, once, in a single process with memory to spare. Which is the right answer, and what is the honest statement about its running time?",
+    "choices": [
+      "Quickselect with a randomly chosen pivot: O(n) expected, O(n^2) worst case, and the randomness is what makes the worst case independent of the input",
+      "Quickselect always taking the first element as pivot, which is O(n) on realistic data",
+      "A size-k max-heap, which is O(n log k) and therefore never worse",
+      "Median of medians, because an O(n) worst-case bound is always preferable to an expected bound"
+    ],
+    "answer": "Quickselect with a randomly chosen pivot: O(n) expected, O(n^2) worst case, and the randomness is what makes the worst case independent of the input",
+    "explanation": "Quickselect recurses into one side only, so its expected cost is n + n/2 + n/4 + ... = O(n) once the pivot is random enough to shrink the range by a constant factor in expectation. The point of the random pivot is not that it improves the average over a fixed pivot on random data (it does not); it is that it moves the quadratic case from 'some inputs, chosen by whoever supplies them' to 'some coin flips, chosen by you', which is the difference between an adversarial denial of service and a rare slow run. Taking the first element is exactly the version that is quadratic on sorted input, which is the most common shape real data comes in. The heap is a genuinely reasonable answer and is the right one when k is small or the data is streaming, but at k near n/2 the log k factor is real and it also needs the k elements in memory. Median of medians gives the worst-case linear bound and is the correct thing to name, but its constant is large enough that it is used as a fallback (introselect switches to it after too many bad splits) rather than as the primary path.",
+    "refs": [
+      "LC 215 Kth Largest Element in an Array",
+      "LC 973 K Closest Points to Origin",
+      "Blum-Floyd-Pratt-Rivest-Tarjan median of medians"
+    ]
+  }
+]
