@@ -1,0 +1,75 @@
+[
+  {
+    "id": "shortestpath-network-delay-code",
+    "title": "Shortest paths from one source with Dijkstra",
+    "kind": "code",
+    "topic": "shortest-path",
+    "difficulty": "medium",
+    "est_minutes": 8,
+    "prompt": "Implement networkDelayTime(times [][]int, n int, k int) int. Nodes are labelled 1..n and times holds directed edges {u, v, w} with a positive travel time w. A signal starts at node k. Return how long it takes to reach every node, or -1 if some node is unreachable.",
+    "code": {
+      "stub": "func networkDelayTime(times [][]int, n int, k int) int {\n\t// your code here\n\treturn -1\n}",
+      "tests": "import \"testing\"\n\nfunc TestNetworkDelayTime(t *testing.T) {\n\tcases := []struct {\n\t\ttimes [][]int\n\t\tn, k  int\n\t\twant  int\n\t}{\n\t\t{[][]int{{2, 1, 1}, {2, 3, 1}, {3, 4, 1}}, 4, 2, 2},\n\t\t{[][]int{{1, 2, 1}}, 2, 1, 1},\n\t\t{[][]int{{1, 2, 1}}, 2, 2, -1},\n\t\t{nil, 1, 1, 0},\n\t\t{[][]int{{1, 2, 9}, {1, 3, 2}, {3, 2, 1}}, 3, 1, 3},\n\t\t{[][]int{{1, 2, 5}, {1, 2, 2}, {2, 3, 1}}, 3, 1, 3},\n\t\t{[][]int{{1, 2, 1}, {2, 1, 1}}, 2, 1, 1},\n\t}\n\tfor _, c := range cases {\n\t\tif got := networkDelayTime(c.times, c.n, c.k); got != c.want {\n\t\t\tt.Fatalf(\"networkDelayTime(%v, %d, %d) = %d, want %d\", c.times, c.n, c.k, got, c.want)\n\t\t}\n\t}\n}\n\n// A greedy that re-relaxes a settled node, or one that stops at the first time\n// it sees a node, gets this chain wrong: the cheap route arrives late.\nfunc TestNetworkDelayTimeDetour(t *testing.T) {\n\ttimes := [][]int{{1, 2, 100}, {1, 3, 1}, {3, 4, 1}, {4, 2, 1}, {2, 5, 1}}\n\tif got := networkDelayTime(times, 5, 1); got != 4 {\n\t\tt.Fatalf(\"detour graph = %d, want 4\", got)\n\t}\n}\n\nfunc TestNetworkDelayTimeLongChain(t *testing.T) {\n\tconst n = 1500\n\ttimes := make([][]int, 0, n-1)\n\tfor i := 2; i <= n; i++ {\n\t\ttimes = append(times, []int{i - 1, i, 1})\n\t}\n\tif got := networkDelayTime(times, n, 1); got != n-1 {\n\t\tt.Fatalf(\"chain of %d = %d, want %d\", n, got, n-1)\n\t}\n}"
+    },
+    "answer": "func networkDelayTime(times [][]int, n int, k int) int {\n\tconst inf = 1 << 30\n\tadj := make([][][2]int, n+1)\n\tfor _, t := range times {\n\t\tadj[t[0]] = append(adj[t[0]], [2]int{t[1], t[2]})\n\t}\n\tdist := make([]int, n+1)\n\tfor i := range dist {\n\t\tdist[i] = inf\n\t}\n\tdist[k] = 0\n\tdone := make([]bool, n+1)\n\tfor step := 0; step < n; step++ {\n\t\tu := 0\n\t\tfor v := 1; v <= n; v++ {\n\t\t\tif !done[v] && dist[v] < inf && (u == 0 || dist[v] < dist[u]) {\n\t\t\t\tu = v\n\t\t\t}\n\t\t}\n\t\tif u == 0 {\n\t\t\tbreak\n\t\t}\n\t\tdone[u] = true\n\t\tfor _, e := range adj[u] {\n\t\t\tif d := dist[u] + e[1]; d < dist[e[0]] {\n\t\t\t\tdist[e[0]] = d\n\t\t\t}\n\t\t}\n\t}\n\tworst := 0\n\tfor v := 1; v <= n; v++ {\n\t\tif dist[v] == inf {\n\t\t\treturn -1\n\t\t}\n\t\tif dist[v] > worst {\n\t\t\tworst = dist[v]\n\t\t}\n\t}\n\treturn worst\n}",
+    "explanation": "This is Dijkstra: keep a tentative distance per node, repeatedly settle the unsettled node with the smallest tentative distance, and relax its outgoing edges. Settling in increasing-distance order is what makes a settled node final, so you never revisit one. The answer is the largest settled distance, and an unsettled node at the end means unreachable. The scan for the minimum is O(n) here, which is fine for a dense graph; swap it for a heap when the graph is sparse.",
+    "hints": [
+      "Start every node at a value larger than any real total, and the source at zero.",
+      "Each round, pick the cheapest node you have not finished with yet, then improve its neighbours through it.",
+      "Parallel edges and edges back to the source are normal input, so only ever lower a distance, never overwrite it."
+    ],
+    "refs": [
+      "LC 743 Network Delay Time",
+      "LC 1514 Path with Maximum Probability"
+    ]
+  },
+  {
+    "id": "strings-strstr-kmp-code",
+    "title": "Substring search without rewinding",
+    "kind": "code",
+    "topic": "strings",
+    "difficulty": "medium",
+    "est_minutes": 10,
+    "prompt": "Implement strStr(haystack, needle string) int returning the index of the first occurrence of needle in haystack, or -1. An empty needle is 0. It must run in O(len(haystack)+len(needle)): the tests include a 200k haystack of one repeated letter that a restart-on-mismatch scan will not finish.",
+    "code": {
+      "stub": "func strStr(haystack, needle string) int {\n\t// your code here\n\treturn -1\n}",
+      "tests": "import (\n\t\"strings\"\n\t\"testing\"\n)\n\nfunc TestStrStr(t *testing.T) {\n\tcases := []struct {\n\t\thaystack, needle string\n\t\twant             int\n\t}{\n\t\t{\"sadbutsad\", \"sad\", 0},\n\t\t{\"leetcode\", \"leeto\", -1},\n\t\t{\"hello\", \"ll\", 2},\n\t\t{\"abc\", \"\", 0},\n\t\t{\"\", \"\", 0},\n\t\t{\"\", \"a\", -1},\n\t\t{\"a\", \"a\", 0},\n\t\t{\"mississippi\", \"issip\", 4},\n\t\t{\"aaab\", \"aab\", 1},\n\t\t{\"abababcab\", \"ababc\", 2},\n\t\t{\"aaaaa\", \"aaaaaa\", -1},\n\t}\n\tfor _, c := range cases {\n\t\tif got := strStr(c.haystack, c.needle); got != c.want {\n\t\t\tt.Fatalf(\"strStr(%q, %q) = %d, want %d\", c.haystack, c.needle, got, c.want)\n\t\t}\n\t}\n}\n\nfunc TestStrStrMatchesStandardLibrary(t *testing.T) {\n\talphabet := \"aab\"\n\ttexts := []string{\"\", \"a\", \"aab\", \"aaabaab\", \"baaabaaab\"}\n\tfor _, text := range texts {\n\t\tfor i := 0; i <= len(alphabet); i++ {\n\t\t\tneedle := alphabet[:i]\n\t\t\tif got, want := strStr(text, needle), strings.Index(text, needle); got != want {\n\t\t\t\tt.Fatalf(\"strStr(%q, %q) = %d, want %d\", text, needle, got, want)\n\t\t\t}\n\t\t}\n\t}\n}\n\n// The naive scan is quadratic on this input and will not finish; only a\n// solution that reuses the prefix table gets through it.\nfunc TestStrStrAdversarialRepeats(t *testing.T) {\n\thaystack := strings.Repeat(\"a\", 200000)\n\tneedle := strings.Repeat(\"a\", 20000) + \"b\"\n\tif got := strStr(haystack, needle); got != -1 {\n\t\tt.Fatalf(\"no-match case = %d, want -1\", got)\n\t}\n\tif got := strStr(haystack+\"b\", needle); got != 180000 {\n\t\tt.Fatalf(\"match case = %d, want 180000\", got)\n\t}\n}"
+    },
+    "answer": "func strStr(haystack, needle string) int {\n\tif len(needle) == 0 {\n\t\treturn 0\n\t}\n\tif len(needle) > len(haystack) {\n\t\treturn -1\n\t}\n\tlps := make([]int, len(needle))\n\tfor i, k := 1, 0; i < len(needle); i++ {\n\t\tfor k > 0 && needle[i] != needle[k] {\n\t\t\tk = lps[k-1]\n\t\t}\n\t\tif needle[i] == needle[k] {\n\t\t\tk++\n\t\t}\n\t\tlps[i] = k\n\t}\n\tfor i, k := 0, 0; i < len(haystack); i++ {\n\t\tfor k > 0 && haystack[i] != needle[k] {\n\t\t\tk = lps[k-1]\n\t\t}\n\t\tif haystack[i] == needle[k] {\n\t\t\tk++\n\t\t}\n\t\tif k == len(needle) {\n\t\t\treturn i - k + 1\n\t\t}\n\t}\n\treturn -1\n}",
+    "explanation": "KMP. First build the prefix table lps, where lps[i] is the length of the longest proper prefix of needle[:i+1] that is also a suffix of it. Then walk the haystack with a match length k and, on a mismatch, fall back to lps[k-1] instead of restarting: the fallback is exactly how much of the needle you have already confirmed. The haystack index never moves backwards, so the scan is linear. The table is built by running the same fallback loop of the needle against itself.",
+    "hints": [
+      "After a mismatch you already know the last few characters you consumed. How much of the pattern do they still satisfy?",
+      "Build the table with the same loop you use for the search, matching the pattern against itself starting one position in.",
+      "The outer index over the text should only ever increase; only the match length may drop."
+    ],
+    "refs": [
+      "LC 28 Find the Index of the First Occurrence in a String",
+      "LC 459 Repeated Substring Pattern",
+      "LC 214 Shortest Palindrome"
+    ]
+  },
+  {
+    "id": "fenwick-tree-code",
+    "title": "A Fenwick tree for mutable range sums",
+    "kind": "code",
+    "topic": "fenwick",
+    "difficulty": "medium",
+    "est_minutes": 9,
+    "prompt": "Implement a Fenwick (binary indexed) tree over ints. NewFenwick(nums []int) *Fenwick builds it, Add(i, delta int) adds delta to index i, and Sum(l, r int) int returns the inclusive sum of indices l..r. Both Add and Sum must be O(log n): the tests do 100k updates and 100k queries.",
+    "code": {
+      "stub": "type Fenwick struct {\n\tn    int\n\ttree []int\n}\n\nfunc NewFenwick(nums []int) *Fenwick {\n\t// your code here\n\treturn &Fenwick{n: len(nums), tree: make([]int, len(nums)+1)}\n}\n\nfunc (f *Fenwick) Add(i, delta int) {\n\t// your code here\n}\n\nfunc (f *Fenwick) Sum(l, r int) int {\n\t// your code here\n\treturn 0\n}",
+      "tests": "import \"testing\"\n\nfunc TestFenwickSmall(t *testing.T) {\n\tf := NewFenwick([]int{1, 3, 5})\n\tif got := f.Sum(0, 2); got != 9 {\n\t\tt.Fatalf(\"Sum(0,2) = %d, want 9\", got)\n\t}\n\tf.Add(1, 2)\n\tif got := f.Sum(0, 2); got != 11 {\n\t\tt.Fatalf(\"after Add(1,2) Sum(0,2) = %d, want 11\", got)\n\t}\n\tif got := f.Sum(1, 1); got != 5 {\n\t\tt.Fatalf(\"Sum(1,1) = %d, want 5\", got)\n\t}\n\tif got := f.Sum(2, 2); got != 5 {\n\t\tt.Fatalf(\"Sum(2,2) = %d, want 5\", got)\n\t}\n}\n\nfunc TestFenwickMatchesBruteForce(t *testing.T) {\n\tconst n = 200\n\tnums := make([]int, n)\n\tseed := 12345\n\tnext := func() int {\n\t\tseed = (seed*1103515245 + 12345) & 0x7fffffff\n\t\treturn seed\n\t}\n\tfor i := range nums {\n\t\tnums[i] = next()%100 - 50\n\t}\n\tplain := append([]int(nil), nums...)\n\tf := NewFenwick(nums)\n\tfor op := 0; op < 2000; op++ {\n\t\ti := next() % n\n\t\tdelta := next()%20 - 10\n\t\tf.Add(i, delta)\n\t\tplain[i] += delta\n\t\tl := next() % n\n\t\tr := l + next()%(n-l)\n\t\twant := 0\n\t\tfor k := l; k <= r; k++ {\n\t\t\twant += plain[k]\n\t\t}\n\t\tif got := f.Sum(l, r); got != want {\n\t\t\tt.Fatalf(\"Sum(%d,%d) = %d, want %d\", l, r, got, want)\n\t\t}\n\t}\n}\n\n// A tree that answers a range sum by walking the array is fast enough above but\n// not here: this needs the logarithmic update and query.\nfunc TestFenwickLargeIsFast(t *testing.T) {\n\tconst n = 100000\n\tf := NewFenwick(make([]int, n))\n\ttotal := 0\n\tfor i := 0; i < n; i++ {\n\t\tf.Add(i, i%7)\n\t\ttotal += i % 7\n\t}\n\tif got := f.Sum(0, n-1); got != total {\n\t\tt.Fatalf(\"full sum = %d, want %d\", got, total)\n\t}\n\tfor q := 0; q < 100000; q++ {\n\t\tl := q % n\n\t\tif got := f.Sum(l, l); got != l%7 {\n\t\t\tt.Fatalf(\"Sum(%d,%d) = %d, want %d\", l, l, got, l%7)\n\t\t}\n\t}\n}"
+    },
+    "answer": "type Fenwick struct {\n\tn    int\n\ttree []int\n}\n\nfunc NewFenwick(nums []int) *Fenwick {\n\tf := &Fenwick{n: len(nums), tree: make([]int, len(nums)+1)}\n\tfor i, v := range nums {\n\t\tf.Add(i, v)\n\t}\n\treturn f\n}\n\nfunc (f *Fenwick) Add(i, delta int) {\n\tfor j := i + 1; j <= f.n; j += j & (-j) {\n\t\tf.tree[j] += delta\n\t}\n}\n\nfunc (f *Fenwick) Sum(l, r int) int {\n\treturn f.prefix(r+1) - f.prefix(l)\n}\n\nfunc (f *Fenwick) prefix(i int) int {\n\tsum := 0\n\tfor j := i; j > 0; j -= j & (-j) {\n\t\tsum += f.tree[j]\n\t}\n\treturn sum\n}",
+    "explanation": "Index j of the tree stores the sum of the j & (-j) elements ending at j, using 1-based internal indices so that the low bit is meaningful. An update walks upward with j += j & (-j), touching every node whose range covers the position; a prefix query walks downward with j -= j & (-j), stripping one low bit at a time and adding each block it lands on. Both loops run once per set bit, so both are O(log n). A range sum is two prefix sums subtracted.",
+    "hints": [
+      "Keep the array one longer than the input and treat position i as internal index i+1; internal index 0 has no low bit to strip and would loop forever.",
+      "The isolated lowest set bit of j is j & (-j). One direction adds it, the other subtracts it: adding climbs to the parent that also covers you, subtracting jumps to the block before yours.",
+      "Build by calling your update once per element rather than writing a separate construction rule."
+    ],
+    "refs": [
+      "LC 307 Range Sum Query - Mutable",
+      "LC 315 Count of Smaller Numbers After Self"
+    ]
+  }
+]

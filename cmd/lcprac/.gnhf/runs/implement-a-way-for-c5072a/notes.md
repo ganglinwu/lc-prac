@@ -92,3 +92,22 @@ Objective: see .gnhf/runs/implement-a-way-for-c5072a/prompt.md
 - A code drill stub must fail its tests without panicking to give a clean failure: the Trie stub returns &Trie{} from its constructor rather than nil, because a nil return would make every method call a nil-pointer panic and the user's first run would show a stack trace instead of a failed assertion. The guard test only checks that the stub does not pass and has no syntax/undefined errors, so panic-avoidance is an authoring judgement the tests will not catch.
 - Grepping the repo root now picks up the gnhf iteration JSONL transcripts under cmd/lcprac/.gnhf/, which echo back entire files that were read earlier in the session and swamp the real matches. Scope greps to internal/ and cmd/lcprac/*.go, or exclude .gnhf explicitly.
 - The drill bank is embedded in the binary via //go:embed, so new questions are not carried by the sync server at all: sync moves progress history only. A second machine picks up these four topics by rebuilding or redeploying the client binary, and until it does its progress file will simply have no records for the new drill ids, which the max-on-counters merge handles as absent rather than as zero.
+
+### Iteration 6
+
+**Summary:** Made sync automatic: a drill session now pulls before it picks drills and pushes when it ends, on by default once a server is configured, with -nosync/-auto off escape hatches and soft failure when the server is unreachable.
+
+**Changes:**
+- internal/synccli: Config gained an `auto` field stored as *bool so a config file written before this iteration reads as auto-on (setting up a server is itself the opt-in), plus Config.AutoEnabled/Ready, an LCPRAC_SYNC_AUTO env override that errors on a non-boolean rather than silently disabling, and NewAutoClient with an 8s timeout so an unattended sync gives up sooner than a hand-typed one.
+- cmd/lcprac/sync.go: autoSync() is the session-time sync; it returns no error at all, so a down server costs a line on stderr and practice continues on local history. autoConfig() stays silent when the machine is unconfigured or auto is off, so an unconfigured machine never even creates progress.json.
+- cmd/lcprac/sync.go: `lcprac sync -auto on|off` persists the setting through the same field-preserving path as -set-url/-set-token, accepting the words the help text uses (on/off/yes/no/true/false) rather than only Go booleans; -status and the save confirmation now report the auto state.
+- cmd/lcprac/main.go: cmdDrill pulls before openStore (so scheduling sees other machines' history) and pushes quietly after the session summary; a new -nosync flag and the existing -nosave both suppress it. Usage text updated for -nosync and -auto.
+- cmd/lcprac/sync_test.go: 9 new tests over pull-before, push-after, quiet mode, the unconfigured no-op, -auto off never touching the network, an unreachable server leaving local history intact, the -auto round trip, its error message, and -status reporting the state. internal/synccli: 2 tests for auto defaulting on for a legacy config and the env override.
+- README.md: the multi-machine section now leads with sessions syncing on their own and documents -nosync, -auto off, LCPRAC_SYNC_AUTO and the -nosave exemption.
+
+**Learnings:**
+- A bool config field added after release must be *bool, not bool: every existing sync.json on a machine already set up would decode `auto` as false and silently keep syncing manual. nil-means-on made the feature retroactive with no migration.
+- The pull must run before openStore() in cmdDrill, not after: the store is read once into memory at session start and drives spaced-repetition priority, so a pull afterwards would merge history the session had already scheduled against.
+- Post-session sync can safely reload from disk rather than reusing the in-memory store, because liveProgress.record saves after every graded drill and logSession saves the sitting; by the time cmdDrill returns, disk is already authoritative.
+- strconv.ParseBool does not accept "on"/"off", which is exactly the vocabulary a CLI flag documented as `-auto on|off` invites. A small parseOnOff wrapper was needed, caught only because the test used the word from the help text.
+- Verifying against the live server without disturbing the real history is easy here: copy sync.json into a temp LCPRAC_HOME and run the binary there. The merge being max-on-counters means the throwaway machine's empty push is provably harmless, so an end-to-end check against production costs nothing.

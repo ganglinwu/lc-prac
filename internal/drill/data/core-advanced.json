@@ -1,0 +1,118 @@
+[
+  {
+    "id": "shortestpath-algorithm-choice",
+    "title": "Which shortest-path algorithm",
+    "kind": "choice",
+    "topic": "shortest-path",
+    "difficulty": "medium",
+    "est_minutes": 2,
+    "prompt": "A weighted directed graph has some negative edge weights but no negative cycle, and you need shortest paths from one source. What do you reach for?",
+    "choices": [
+      "Bellman-Ford: relax every edge V-1 times, which tolerates negative weights",
+      "Dijkstra with a min-heap, since it handles any weights",
+      "BFS from the source, since it visits nodes in distance order",
+      "Dijkstra after adding a constant to every weight to make them positive"
+    ],
+    "answer": "Bellman-Ford: relax every edge V-1 times, which tolerates negative weights",
+    "explanation": "Dijkstra settles a node the moment it is the cheapest unsettled one and never looks at it again; a negative edge discovered later can undercut that, so the answer is simply wrong. Shifting all weights up does not save it either, because it penalises paths with more edges and changes which path is shortest. Bellman-Ford is O(V*E) but makes no ordering assumption, and a V-th pass that still improves something proves a negative cycle. BFS only gives distances when every edge costs the same.",
+    "refs": [
+      "LC 787 Cheapest Flights Within K Stops",
+      "LC 743 Network Delay Time"
+    ]
+  },
+  {
+    "id": "shortestpath-heap-cost",
+    "title": "Cost of heap Dijkstra",
+    "kind": "complexity",
+    "topic": "shortest-path",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "You run Dijkstra with a binary min-heap, pushing a node again every time you lower its distance instead of decreasing a key in place. What is the running time, and how many entries can the heap hold?",
+    "answer": "O((V + E) log V), with up to E entries in the heap. Every edge can cause one push, so the heap holds O(E) stale-plus-live entries, and each push and pop costs log of that, which is O(log V) since E is at most V^2.",
+    "explanation": "This is the lazy-deletion variant everyone actually writes: you never delete the stale entries, you just skip a popped node that is already settled, or whose popped distance is worse than the recorded one. That skip check is what keeps correctness. Compare the array-scan version at O(V^2), which is the better choice on a dense graph where E approaches V^2.",
+    "hints": [
+      "Count how many times a node can enter the heap, not how many nodes there are."
+    ],
+    "refs": [
+      "LC 743 Network Delay Time",
+      "LC 1631 Path With Minimum Effort"
+    ]
+  },
+  {
+    "id": "strings-prefix-function",
+    "title": "What the prefix table means",
+    "kind": "recall",
+    "topic": "strings",
+    "difficulty": "medium",
+    "est_minutes": 4,
+    "prompt": "In KMP you precompute lps over the pattern. State exactly what lps[i] holds, and what you do with it when a mismatch happens at match length k.",
+    "answer": "lps[i] is the length of the longest proper prefix of pattern[:i+1] that is also a suffix of it. On a mismatch with match length k you set k = lps[k-1] and compare again, repeating while k is above zero and the characters still disagree. You never move the text index backwards.",
+    "explanation": "The table answers 'given that the last k characters of the text matched the first k of the pattern, what is the longest pattern prefix that is still alive here'. Proper matters: it excludes the whole string, or the fallback would not shrink and the loop would not terminate. This is also why the table alone solves repeated-substring-pattern: n - lps[n-1] is the candidate period.",
+    "hints": [
+      "It is a property of the pattern only, and it is about prefixes that are also suffixes."
+    ],
+    "refs": [
+      "LC 28 Find the Index of the First Occurrence in a String",
+      "LC 459 Repeated Substring Pattern"
+    ]
+  },
+  {
+    "id": "strings-rolling-hash-when",
+    "title": "Rolling hash or KMP",
+    "kind": "choice",
+    "topic": "strings",
+    "difficulty": "medium",
+    "est_minutes": 2,
+    "prompt": "You must decide, for one long text, whether any of 10000 different patterns of the same length appears in it. Which approach fits best?",
+    "choices": [
+      "Rabin-Karp: hash every window of that length once, then look each pattern's hash up in a set and verify a hit",
+      "Run KMP once per pattern against the text",
+      "Build a suffix array of the text and binary search each pattern",
+      "Sort the patterns and binary search the text"
+    ],
+    "answer": "Rabin-Karp: hash every window of that length once, then look each pattern's hash up in a set and verify a hit",
+    "explanation": "Equal-length patterns are exactly the case a rolling hash wins: one linear pass over the text produces every window hash, and each pattern is then a set lookup. KMP is linear per pattern, so it is 10000 passes over the text. Always verify a hash hit by comparing the characters, since a collision is possible; that check is cheap because it only runs on candidates.",
+    "refs": [
+      "LC 1044 Longest Duplicate Substring",
+      "LC 187 Repeated DNA Sequences"
+    ]
+  },
+  {
+    "id": "fenwick-low-bit-loops",
+    "title": "The two low-bit loops",
+    "kind": "recall",
+    "topic": "fenwick",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "A Fenwick tree has one loop that adds the lowest set bit and one that subtracts it. Which loop belongs to the point update and which to the prefix query, and why does each stop?",
+    "answer": "The update adds: j += j & (-j) climbs to every larger block that contains this position, and stops once j runs past n. The query subtracts: j -= j & (-j) strips the lowest set bit, so it hops from one disjoint block to the block ending just before it, and stops at zero. Each loop runs once per bit, so both are logarithmic.",
+    "explanation": "Node j owns the j & (-j) positions ending at j, so climbing by the low bit finds the next node whose range still covers you, while stripping the low bit walks a prefix as a sum of disjoint power-of-two blocks. The two directions are exactly complementary, which is why the tree needs no rebuild after an update.",
+    "hints": [
+      "One walks outward over the ranges that contain a position; the other decomposes a prefix into disjoint pieces."
+    ],
+    "refs": [
+      "LC 307 Range Sum Query - Mutable"
+    ]
+  },
+  {
+    "id": "fenwick-vs-prefix-array",
+    "title": "Prefix array or Fenwick tree",
+    "kind": "choice",
+    "topic": "fenwick",
+    "difficulty": "medium",
+    "est_minutes": 2,
+    "prompt": "An array of 100k numbers gets 100k operations mixed in any order: some update a single element, some ask for the sum of a range. What do you build?",
+    "choices": [
+      "A Fenwick tree, which does both the update and the range sum in O(log n)",
+      "A prefix-sum array, rebuilt after each update",
+      "A hash map from range to sum, populated lazily",
+      "A max-heap over the values"
+    ],
+    "answer": "A Fenwick tree, which does both the update and the range sum in O(log n)",
+    "explanation": "A prefix-sum array answers a range in O(1) but costs O(n) to repair after any write, so a mixed workload degrades to O(n) per operation, about 10^10 steps here. The tell is writes interleaved with range queries. Reach for a segment tree instead when the query is not an invertible operation like sum: min and max cannot be recovered by subtracting two prefixes.",
+    "refs": [
+      "LC 307 Range Sum Query - Mutable",
+      "LC 303 Range Sum Query - Immutable"
+    ]
+  }
+]
