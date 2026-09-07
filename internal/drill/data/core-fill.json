@@ -1,0 +1,131 @@
+[
+ {
+  "id": "lis-patience-tails-meaning",
+  "title": "What the tails array holds",
+  "kind": "recall",
+  "topic": "lis",
+  "difficulty": "medium",
+  "est_minutes": 4,
+  "prompt": "In the O(n log n) longest increasing subsequence algorithm you maintain an array tails. State exactly what tails[k] means, why the array is sorted, why its contents are usually not a valid subsequence of the input, and what you would have to record to recover an actual longest subsequence.",
+  "answer": "tails[k] is the smallest value that can end an increasing subsequence of length k+1 among the prefix processed so far. It is sorted because a longer run's best ending value can never be smaller than a shorter run's: truncating a length k+1 run gives a length k run ending at a smaller value, so tails[k] < tails[k+1]. Each new value v is placed by binary search: if it is larger than every tail it appends (a new longest length), otherwise it overwrites the first tail >= v, which can only lower that entry and never invalidates the ordering. The contents are not a subsequence of the input because entries are overwritten independently, so tails can end up holding values that never appeared together in increasing positions; only its LENGTH is meaningful. To recover a real subsequence, record for each element the length it landed at and the index of the element then sitting at the previous length, then walk those predecessor links back from the last element that achieved the maximum length.",
+  "explanation": "The usual failure is trusting the array's contents. On [10, 9, 2, 5, 3, 7, 101, 18] tails finishes as [2, 3, 7, 18], which happens to be a valid subsequence, but on [1, 9, 2] it finishes as [1, 2] where the 2 came after the 9 was overwritten. The length is invariant and correct; the witness has to be reconstructed from predecessor links, and that reconstruction costs an extra O(n) array, not extra time.",
+  "hints": [
+   "Fix k and ask what property makes one candidate ending value better than another.",
+   "What does the answer to that make true about tails[k] versus tails[k+1]?"
+  ],
+  "refs": [
+   "LeetCode 300 Longest Increasing Subsequence"
+  ]
+ },
+ {
+  "id": "lis-envelopes-sort-choice",
+  "title": "LIS in two dimensions",
+  "kind": "choice",
+  "topic": "lis",
+  "difficulty": "medium",
+  "est_minutes": 3,
+  "prompt": "You have n envelopes (w, h) and may nest one inside another only when both its width and its height are strictly smaller. You want the longest nesting chain, and you plan to sort the envelopes and run the O(n log n) LIS on the heights. What sort order makes that correct?",
+  "choices": [
+   "Width ascending, and for equal widths height ascending",
+   "Width ascending, and for equal widths height descending",
+   "Height ascending, and for equal heights width ascending",
+   "By width plus height ascending, ties broken arbitrarily"
+  ],
+  "answer": "Width ascending, and for equal widths height descending",
+  "explanation": "Sorting by width ascending makes the width condition automatic for any subsequence taken left to right, so only heights are left to handle, and a strictly increasing subsequence of heights is exactly a nesting chain. The trap is equal widths: two envelopes of the same width can never nest, but they sit next to each other in the sorted order, so an increasing pair of heights among them would be counted. Sorting equal widths by height DESCENDING makes their heights non-increasing, so a strictly increasing height subsequence can never pick two of them. Height-first sorting has the same problem mirrored, and sorting by the sum of the dimensions does not order the pairs by either coordinate.",
+  "hints": [
+   "Which of the two conditions does the sort make free, and which one is left for the LIS?",
+   "What goes wrong for two envelopes that share a width?"
+  ],
+  "refs": [
+   "LeetCode 354 Russian Doll Envelopes"
+  ]
+ },
+ {
+  "id": "combinatorics-first-obstacle-decomposition",
+  "title": "Counting paths that avoid a set of cells",
+  "kind": "recall",
+  "topic": "combinatorics",
+  "difficulty": "hard",
+  "est_minutes": 5,
+  "prompt": "You can count monotone lattice paths on an enormous grid with one binomial, but a handful of cells are blocked. Explain why subtracting the paths through each blocked cell is wrong, why full inclusion-exclusion is not an option, and what decomposition makes the subtraction correct in O(k^2).",
+  "answer": "Subtracting per blocked cell double subtracts: a path that passes through two blocked cells is removed once for each of them, so the count comes out too low (and the error compounds with more obstacles). Full inclusion-exclusion over subsets of obstacles fixes that but costs 2^k terms, which is hopeless past about 20 obstacles. The fix is to make the bad classes disjoint by classifying each bad path by the FIRST blocked cell it enters. Let f[i] be the number of paths from the start to obstacle i that touch no other obstacle earlier. Then f[i] = C(start -> i) - sum over j of f[j] * C(j -> i), summed over obstacles j that are reachable from the start and can reach i (row and column both no greater). Since each bad path has exactly one first obstacle, the f values partition the bad paths. Sorting the obstacles by row then column guarantees every j that can precede i appears before i, so a single forward pass computes every f[i] in O(k^2). Appending the destination as one more point and running the same recurrence on it leaves the answer sitting in the last slot: the paths to the finish whose first obstacle is nothing.",
+  "explanation": "The pattern generalises past grids: whenever bad objects can overlap, look for an attribute of a bad object that is unique to it (first violation, leftmost violation, smallest witness) and count by that attribute instead of by which constraints are violated. That converts an exponential inclusion-exclusion into a quadratic DP over the constraints. The binomials themselves need factorials and inverse factorials up to rows+cols, built with one modular exponentiation and a backward sweep rather than one exponentiation per term.",
+  "hints": [
+   "What happens to a path that meets two of the blocked cells?",
+   "Each bad path has many blocked cells on it but only one of a particular kind. Which kind?"
+  ],
+  "refs": [
+   "Codeforces 559C Gerald and Giant Chess",
+   "LeetCode 63 Unique Paths II"
+  ]
+ },
+ {
+  "id": "combinatorics-catalan-reflection-choice",
+  "title": "Counting sequences that never go negative",
+  "kind": "choice",
+  "topic": "combinatorics",
+  "difficulty": "medium",
+  "est_minutes": 3,
+  "prompt": "How many sequences of n opening and n closing brackets are balanced, meaning no prefix ever has more closing than opening brackets? You want a closed form, not a DP. Which counting argument gives it?",
+  "choices": [
+   "C(2n, n) minus C(2n, n-1): every bad sequence maps one to one onto an unrestricted sequence with one extra closing bracket, by flipping everything after the first offending prefix",
+   "C(2n, n) divided by 2, since half of all arrangements are balanced by symmetry",
+   "C(2n, n) minus n, since exactly one bad sequence starts at each offending position",
+   "2^n minus n!, counting all bracket strings and removing the orderings that repeat"
+  ],
+  "answer": "C(2n, n) minus C(2n, n-1): every bad sequence maps one to one onto an unrestricted sequence with one extra closing bracket, by flipping everything after the first offending prefix",
+  "explanation": "This is the reflection argument, and the result C(2n,n) - C(2n,n-1) = C(2n,n)/(n+1) is the nth Catalan number. Take any bad sequence and find the first prefix where closing brackets lead by one; flip every bracket after that point. The result has n-1 openings and n+1 closings, and the map is reversible (find the first prefix where closings lead by one in the image and flip back), so the bad sequences are in bijection with ALL arrangements of n-1 openings and n+1 closings, of which there are C(2n, n-1). Note the shape: reflection is the same trick as the first-obstacle decomposition, a bijection anchored at the FIRST place the constraint breaks, which is what makes it well defined. The symmetry answer is simply false (for n=2, 4 of the 6 arrangements are balanced, not 3), and the other two are not counts of anything.",
+  "hints": [
+   "The bad sequences are what you have to subtract. Can you turn each one into something easy to count?",
+   "Anchor the transformation at the first moment the sequence goes wrong, so it is reversible."
+  ],
+  "refs": [
+   "Catalan numbers",
+   "LeetCode 22 Generate Parentheses"
+  ]
+ },
+ {
+  "id": "parsing-precedence-levels",
+  "title": "One function per precedence level",
+  "kind": "recall",
+  "topic": "parsing",
+  "difficulty": "medium",
+  "est_minutes": 4,
+  "prompt": "Describe the recursive descent structure for an expression grammar with + - * / and parentheses: which functions exist, which calls which, where a unary minus is handled, and how the structure would change if you had to add a right-associative operator like exponentiation.",
+  "answer": "One function per precedence level, lowest at the top. sum() parses a term, then loops while the next operator is + or -, consuming it and combining with another term. term() parses a factor, then loops while the next operator is * or /, consuming it and combining with another factor. factor() handles a single operand: a run of digits, a unary + or - followed by another factor (recursing at its own level so the sign binds to the operand and not to the whole product), or a ( which calls sum() and consumes the matching ). All three share one position index into the string, so the input is read once with no copying. Each level returns as soon as it sees an operator it does not own, which is exactly how the operator reaches the level that does. Left associativity comes from the loop: the value accumulated so far is always the left operand. A right-associative operator instead needs recursion at the SAME level after consuming the operator (parse the left operand, see ^, then call the same function for the right side), so a ^ b ^ c groups as a ^ (b ^ c).",
+  "explanation": "The reason to prefer this over an ad hoc scan is that precedence stops being a special case: adding comparison operators or a boolean level means adding a function between the existing ones and repointing two calls, not rewriting a loop. Its one real weakness is stack depth, since nesting depth becomes recursion depth; the iterative equivalent is the shunting yard algorithm with an operator stack and an operand stack, where the loop that pops operators of greater or equal precedence plays the role of returning from a level.",
+  "hints": [
+   "The operator that binds most loosely should be handled by the function that runs first, not last. Why?",
+   "What tells a level that it is finished and should hand control back?"
+  ],
+  "refs": [
+   "LeetCode 227 Basic Calculator II",
+   "LeetCode 772 Basic Calculator III"
+  ]
+ },
+ {
+  "id": "parsing-single-stack-signs-choice",
+  "title": "The stack trick for + and - with parentheses",
+  "kind": "choice",
+  "topic": "parsing",
+  "difficulty": "medium",
+  "est_minutes": 3,
+  "prompt": "For an expression with only + - and parentheses (no * or /), a classic one-pass solution keeps a running result, a current sign, and a single stack. What goes on the stack when a ( is read?",
+  "choices": [
+   "The result accumulated so far and the sign in front of the parenthesis, after which both are reset to start the inner expression",
+   "The index of the ( so its matching ) can be found later",
+   "The whole substring inside the parentheses, to be evaluated by a recursive call",
+   "Every operand seen so far, so they can be re-added when the ) is reached"
+  ],
+  "answer": "The result accumulated so far and the sign in front of the parenthesis, after which both are reset to start the inner expression",
+  "explanation": "The inner expression is evaluated with a fresh result of 0 and a fresh sign of +1, exactly as if it were the whole input. On the closing ), pop the saved sign, multiply the inner result by it, and add the saved outer result: that is the same as distributing a leading minus over everything inside, which is why 1-(2+3) works without ever negating the operands individually. This is really the recursive descent call stack made explicit, which is why it only stretches to + and -; once * and / are in play a single accumulator is not enough state and you want either two stacks or the one-function-per-level recursion. Storing indices or substrings turns a one-pass scan into repeated re-scanning of nested text, which is quadratic on deeply nested input.",
+  "hints": [
+   "What state would a recursive call have needed to save before descending?",
+   "Think about what a minus sitting in front of the parenthesis has to do to everything inside."
+  ],
+  "refs": [
+   "LeetCode 224 Basic Calculator"
+  ]
+ }
+]
