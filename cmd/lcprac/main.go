@@ -350,13 +350,21 @@ func cmdTopics(args []string) error {
 	if err != nil {
 		return err
 	}
+	// The name column is sized to the longest topic so a long one like
+	// meet-in-the-middle does not push its own row out of line.
+	width := 16
+	for _, t := range set.Topics() {
+		if len(t) > width {
+			width = len(t)
+		}
+	}
 	for _, t := range set.Topics() {
 		ds := set.Filter(t, "", "")
 		mins := 0
 		for _, d := range ds {
 			mins += d.EstMinutes
 		}
-		fmt.Printf("%-16s %2d drills  %2dm\n", t, len(ds), mins)
+		fmt.Printf("%-*s %2d drills  %2dm\n", width, t, len(ds), mins)
 	}
 	return nil
 }

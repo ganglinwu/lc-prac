@@ -1,0 +1,128 @@
+[
+ {
+  "id": "digit-dp-state-design",
+  "title": "The state a digit DP carries",
+  "kind": "recall",
+  "topic": "digit-dp",
+  "difficulty": "hard",
+  "est_minutes": 5,
+  "prompt": "You are counting numbers up to a 18-digit bound that satisfy some digit property. Name the pieces of state a digit DP carries, say which of them may be memoised on and which may not, and say what goes wrong if you drop the 'started' flag.",
+  "answer": "The state is: the position you are filling (left to right), whatever the property needs about the digits placed so far (the previous digit, a running remainder, a mask of digits used, a count), a boolean tight meaning the prefix so far is exactly the bound's prefix, and a boolean started meaning at least one non-zero digit has been placed. Memoise on (position, property state, started) only. You must not memoise across the tight flag, because tight prefixes are not interchangeable: there is exactly one tight path, so tight states are visited once each and caching them either wastes memory or, if the cache is keyed without the flag, returns a free-position count for a bounded position. Dropping started treats the leading zeros of a shorter number as real digits: a 5 becomes 000...005, so a 'no two adjacent equal digits' property rejects it for the run of zeros, an 'all digits distinct' property rejects everything with more than one leading zero, and a 'sum of digits' property is unharmed, which is what makes the bug intermittent and easy to miss. While started is false the only digit you may place that keeps it false is 0, and placing a non-zero digit flips it and begins the property tracking.",
+  "explanation": "Digit DP is worth thinking of as counting paths through a 10-ary trie of digit strings, where the bound cuts the trie along a single root-to-leaf path. Everything strictly to the left of that path is free and countable in bulk; the path itself is walked once. That picture tells you immediately why tight is not a memoisable dimension (it is a single path, not a subproblem repeated across the tree) and why started exists (the trie's shorter numbers live at shallower depths, and padding them with zeros is a different string). In practice write the free-completion count as a small closed form or table if you can, and only reach for the full memoised recursion when the property's state is rich enough to need it. The same skeleton answers 'count in [L, R]' as f(R) - f(L-1), where the decrement is on the decimal string rather than on an integer if the bound does not fit in a machine word.",
+  "hints": [
+   "List the questions you must be able to answer before placing the next digit; each one is a piece of state.",
+   "How many times is a prefix that exactly matches the bound ever visited? What does that say about caching it?"
+  ],
+  "refs": [
+   "LC 2376 Count Special Integers",
+   "LC 1012 Numbers With Repeated Digits",
+   "LC 902 Numbers At Most N Given Digit Set"
+  ]
+ },
+ {
+  "id": "digit-dp-range-and-alternatives-choice",
+  "title": "Counting inside a range",
+  "kind": "choice",
+  "topic": "digit-dp",
+  "difficulty": "medium",
+  "est_minutes": 3,
+  "prompt": "You can already count the valid numbers in [1, n] for a bound given as a decimal string. The question now asks for the count in [L, R], where both are up to 10^18 and both are given as strings. What is the right move?",
+  "choices": [
+   "Count up to R, count up to L-1 by decrementing the decimal string, and subtract",
+   "Count up to R and count up to L, then subtract, since one bound off is within tolerance for a counting problem",
+   "Run the digit DP once with two tight flags, one against L from below and one against R from above",
+   "Convert both to integers, subtract, and count over the resulting width"
+  ],
+  "answer": "Count up to R, count up to L-1 by decrementing the decimal string, and subtract",
+  "explanation": "Counting is a prefix-difference problem: f(R) - f(L-1) is exact, and the only care needed is that L-1 is computed on the string (borrowing through zeros, and handling L = 1 as an empty range) since 10^18 fits in an int64 but the habit should survive bounds that do not. Subtracting f(L) instead is simply wrong whenever L itself is valid, which is not a tolerance question. The two-tight-flag version does exist and is what you write when the range cannot be split (for instance when the property depends on both ends), but it doubles the state for no gain here. Converting to integers and 'counting over the width' is not a thing: validity is not translation-invariant, since the valid numbers are not evenly spaced.",
+  "refs": [
+   "LC 2719 Count of Integers",
+   "LC 600 Non-negative Integers without Consecutive Ones",
+   "LC 1067 Digit Count in Range"
+  ]
+ },
+ {
+  "id": "game-theory-sprague-grundy",
+  "title": "Why the xor",
+  "kind": "recall",
+  "topic": "game-theory",
+  "difficulty": "hard",
+  "est_minutes": 5,
+  "prompt": "State the Sprague-Grundy theorem: what class of games it covers, how a position's value is defined, how the values of independent games combine, and what the value 0 means.",
+  "answer": "It covers impartial games under normal play: both players have the same moves available from any position (the moves depend on the position, not on whose turn it is), the game is finite and acyclic, and the player with no move loses. The Grundy value of a position is g(p) = mex{ g(q) : q reachable from p in one move }, where mex is the smallest non-negative integer not in the set; a terminal position has value 0. The theorem says a position with value g behaves exactly like a single Nim pile of g stones, and that the value of several independent games played side by side (a move is made in exactly one of them) is the xor of their values. A value of 0 is a loss for the player to move, and any non-zero value is a win, with the winning move being the one that makes the xor zero. Nim itself is the special case where a pile of n has value n, which is why the whole subject is usually met as 'xor the pile sizes'.",
+  "explanation": "The two halves are worth remembering separately because they fail separately. Mex is the reason values are numbers rather than just win/lose labels: a win/lose label cannot be combined across games, since two losing games form a losing game but two winning games can form either. Xor is the reason the values compose, and the intuition is the mirroring argument: if the xor is zero the second player can always restore it to zero, so the first player runs out of moves first; if it is non-zero the first player can move to make it zero. The conditions matter in interviews. Partisan games (chess, and anything where the two players have different move sets) are outside the theorem entirely. Misere play, where the player who cannot move wins, is outside it too and needs its own analysis. And a game with cycles has no well-founded mex, which is why 'may pass' or 'may add stones' variants have to be handled by other means.",
+  "hints": [
+   "Why is a win/lose label not enough information to combine two games?",
+   "Say what the smallest unreachable value is standing in for."
+  ],
+  "refs": [
+   "LC 1908 Game of Nim",
+   "LC 877 Stone Game",
+   "LC 1025 Divisor Game"
+  ]
+ },
+ {
+  "id": "game-theory-misere-nim-choice",
+  "title": "When losing is the goal",
+  "kind": "choice",
+  "topic": "game-theory",
+  "difficulty": "hard",
+  "est_minutes": 4,
+  "prompt": "Ordinary Nim: several piles, remove any positive number of stones from one pile, the player who cannot move loses, and the player to move wins iff the xor of the pile sizes is non-zero. The rule is now flipped: the player who takes the last stone loses. What is the winning condition for the player to move?",
+  "choices": [
+   "If every pile has exactly one stone, the player to move wins iff the number of piles is even; otherwise the ordinary rule applies and they win iff the xor is non-zero",
+   "The same as ordinary Nim with the answer negated: win iff the xor is zero",
+   "The same as ordinary Nim, since flipping who wins at the end does not change the structure of the game",
+   "Win iff the number of piles with more than one stone is odd"
+  ],
+  "answer": "If every pile has exactly one stone, the player to move wins iff the number of piles is even; otherwise the ordinary rule applies and they win iff the xor is non-zero",
+  "explanation": "Misere play is outside Sprague-Grundy, so the honest way to get this is to look at where the two games actually differ. They differ only at the very end: as long as some pile has at least two stones, the player who is winning the normal game can steer the endgame either way, so the normal-play condition still decides it. Once every pile is a single stone the game is pure parity, and the goal is reversed, so an even number of piles is a win rather than a loss. Negating the whole condition is the tempting wrong answer and it fails on a single pile of 2: xor is non-zero so 'negated' says loss, but the player to move takes one stone and hands over the last one. The lesson is bigger than Nim: misere versions of impartial games have to be analysed on their own, and the one-stone case is the standard place where the correction lives.",
+  "refs": [
+   "LC 292 Nim Game",
+   "LC 1908 Game of Nim"
+  ]
+ },
+ {
+  "id": "meet-in-the-middle-when-to-split",
+  "title": "Recognising a meet-in-the-middle",
+  "kind": "recall",
+  "topic": "meet-in-the-middle",
+  "difficulty": "medium",
+  "est_minutes": 4,
+  "prompt": "Give the signature that says a problem wants meet in the middle rather than DP or plain enumeration, the cost you are trading for, and the two structural requirements the problem must satisfy for the split to be legal.",
+  "answer": "The signature is a small n with a large value range: n around 30 to 45 (2^n out of reach, 2^(n/2) about a million), values or targets too large to index a DP table by, and a question about subsets or assignments rather than about order. You trade 2^n time for roughly 2^(n/2) * n time and 2^(n/2) memory, which is the whole point: the memory is what buys the time back. The two requirements are that the objective must decompose across the split, so the value of a whole choice is a combination (usually a sum, xor or concatenation) of the value of its left part and the value of its right part with no interaction between them, and that the combination must be searchable, so that after sorting or hashing one side you can answer 'which right parts complete this left part' in O(log) or O(1) rather than by scanning. Counting sums at most a target, hitting a sum exactly, and getting closest to a target all qualify; anything where an element's contribution depends on which other elements are chosen on the far side does not.",
+  "explanation": "The reason to name the requirements rather than just the size is that the size alone tempts you into splitting problems that do not decompose. If the objective involves an order across the whole input, or a constraint that pairs an element of the left half with a specific element of the right half, the two halves are not independent and the sorted-and-search step has nothing to search on. When the objective does decompose, the second half of the work is a small menu of standard finishes: sort both sides and sweep with two pointers for a monotone predicate, sort one side and binary search for closest-to-target, or hash one side for exact hits. The 4-sum problem is the same technique in miniature (pair sums on each side, hash one side), which is a useful anchor because it makes clear that meet in the middle is not really about n = 40, it is about splitting a search space in two and paying memory to join the halves.",
+  "hints": [
+   "Compare 2^40 with 2^20 and say which one a laptop can hold in memory.",
+   "What has to be true about the objective for the left half's contribution to be computable without knowing the right half's choice?"
+  ],
+  "refs": [
+   "LC 1755 Closest Subsequence Sum",
+   "LC 2035 Partition Array Into Two Arrays to Minimize Sum Difference",
+   "LC 18 4Sum",
+   "LC 805 Split Array With Same Average"
+  ]
+ },
+ {
+  "id": "meet-in-the-middle-balanced-partition-choice",
+  "title": "Splitting 2n numbers into two equal halves",
+  "kind": "choice",
+  "topic": "meet-in-the-middle",
+  "difficulty": "hard",
+  "est_minutes": 4,
+  "prompt": "You are given 2n numbers with n up to 15, and must split them into two groups of exactly n each, minimising the absolute difference of the group sums. Values reach 10^7 in magnitude and may be negative. Which approach works?",
+  "choices": [
+   "Enumerate the subsets of each half bucketed by how many elements they take, sort each bucket, and for each left subset of size k binary search the size n-k bucket on the right for the sum closest to half the total",
+   "Enumerate all 2^(2n) subsets and keep those of size n, since 2^30 is only a billion",
+   "Sort all 2n values and alternate them between the two groups, which balances the sums greedily",
+   "Run a knapsack over sums with an extra dimension for how many elements have been taken"
+  ],
+  "answer": "Enumerate the subsets of each half bucketed by how many elements they take, sort each bucket, and for each left subset of size k binary search the size n-k bucket on the right for the sum closest to half the total",
+  "explanation": "The size constraint is what makes this more than the plain version: a left subset of size k can only be completed by a right subset of size n-k, so the popcount has to become a bucket key rather than being ignored. With that, each half has 2^15 subsets spread over 16 buckets, sorting is trivial, and the search is a binary search per left subset for the value nearest to half the total, which is the standard closest-to-target finish. Enumerating 2^30 subsets is about a billion iterations each of which needs a popcount and a sum, which is the approach the constraint n <= 15 is chosen to exclude. The greedy alternation is not optimal and fails on inputs as small as four numbers. The knapsack is the right instinct in general but the sums here span roughly 3 * 10^8 values and can be negative, so the table cannot be allocated; that value range is exactly the clue that pushes you to split the input instead.",
+  "refs": [
+   "LC 2035 Partition Array Into Two Arrays to Minimize Sum Difference",
+   "LC 1755 Closest Subsequence Sum",
+   "LC 698 Partition to K Equal Sum Subsets"
+  ]
+ }
+]
