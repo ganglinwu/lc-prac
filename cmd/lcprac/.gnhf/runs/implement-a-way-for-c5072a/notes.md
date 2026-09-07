@@ -111,3 +111,19 @@ Objective: see .gnhf/runs/implement-a-way-for-c5072a/prompt.md
 - Post-session sync can safely reload from disk rather than reusing the in-memory store, because liveProgress.record saves after every graded drill and logSession saves the sitting; by the time cmdDrill returns, disk is already authoritative.
 - strconv.ParseBool does not accept "on"/"off", which is exactly the vocabulary a CLI flag documented as `-auto on|off` invites. A small parseOnOff wrapper was needed, caught only because the test used the word from the help text.
 - Verifying against the live server without disturbing the real history is easy here: copy sync.json into a temp LCPRAC_HOME and run the binary there. The merge being max-on-counters means the throwaway machine's empty push is provably harmless, so an end-to-end check against production costs nothing.
+
+### Iteration 7
+
+**Summary:** Expanded the drill bank from 72 to 81 drills by adding three missing interview-staple topics (shortest-path/Dijkstra, strings/KMP, fenwick tree), each with a machine-graded code drill plus two conceptual drills, all verified by the existing bank guard tests.
+
+**Changes:**
+- internal/drill/data/code-advanced.json: three machine-graded code drills. networkDelayTime as single-source Dijkstra (settle the cheapest unsettled node, relax its out-edges, -1 if anything stays unreachable); strStr via the KMP prefix function; a Fenwick tree with NewFenwick/Add/Sum over inclusive ranges. Each ships a stub that compiles and fails without panicking, a model answer proven to pass its own tests, and hints that do not quote the answer.
+- Code-drill tests discriminate on complexity, not just correctness: the KMP drill's 200k repeated-letter haystack with a 20k needle makes a restart-on-mismatch scan unfinishable, and the Fenwick drill's 100k updates plus 100k queries rules out an O(n)-per-query walk. The Dijkstra drill adds a detour graph where the cheap route arrives late, so a solution that fixes a node on first sight gets it wrong.
+- internal/drill/data/core-advanced.json: six recall/choice/complexity drills, two per new topic. Bellman-Ford vs Dijkstra under negative weights and the O((V+E) log V) cost of lazy-deletion heap Dijkstra; the exact meaning of lps[i] and the fallback rule, plus Rabin-Karp vs per-pattern KMP for many equal-length patterns; which low-bit loop is the update and which the query, and Fenwick vs a rebuilt prefix array on a mixed read/write workload.
+- README.md deck description updated to 81 drills across 24 topics with the three new topic names, and the machine-graded code-drill count corrected from 20 to 23.
+
+**Learnings:**
+- drill.Validate only accepts difficulty "easy" or "medium"; "hard" fails every bank test with 'unknown difficulty'. Adding a hard tier is a code change across drill.go and the session mixer, not a data change, so genuinely harder drills currently have to be filed as medium.
+- Because codecheck writes preamble/source/tests as three separate files (support.go, solution.go, solution_test.go) rather than concatenating them, a drill's test file can carry its own imports independent of the solution. That is what lets the KMP drill cross-check against strings.Index without forcing the stub to import anything.
+- Authoring loop that avoids wasted test cycles: write each Go fragment to a real .go file under /tmp, prepend 'package lcdrill' into a check copy, run gofmt -l over the copies, then run the answer and the stub through a throwaway module with `go test -timeout 60s`. This confirms model-answer-passes and stub-fails in about a second each, versus ~15s for the drill package's full compile-every-drill suite.
+- macOS has no `timeout` binary in this shell, so a guarded test run has to use `go test -timeout`, not a `timeout` prefix.

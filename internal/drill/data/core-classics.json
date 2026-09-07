@@ -1,0 +1,117 @@
+[
+  {
+    "id": "design-lru-structures",
+    "title": "What an LRU cache is made of",
+    "kind": "recall",
+    "topic": "design",
+    "difficulty": "medium",
+    "est_minutes": 4,
+    "prompt": "An LRU cache has to serve both Get and Put in O(1). Name the two structures it combines, say what each is responsible for, and explain why the list has to be doubly linked.",
+    "answer": "A hash map from key to the list node holding that key, and a doubly linked list of nodes ordered most-recently-used at the front and least at the back. The map gives O(1) lookup of a node; the list gives O(1) reordering on a hit and O(1) eviction from the back. The links have to run both ways because unlinking a node reached through the map needs its predecessor, and a singly linked list would have to walk from the head to find it, making every touch O(n).",
+    "explanation": "The trick is what the map values are: nodes, not values. Storing the value would mean the ordering structure has to be searched on every hit, which is exactly the O(n) you were trying to avoid. Two details make the implementation short: sentinel head and tail nodes so no operation special-cases an empty list or an end, and a key stored inside the node so eviction can delete the right map entry without a reverse lookup.",
+    "hints": [
+      "One structure answers 'where is this key', the other answers 'what was used longest ago'."
+    ],
+    "refs": [
+      "LC 146 LRU Cache"
+    ]
+  },
+  {
+    "id": "design-lfu-change",
+    "title": "From LRU to LFU",
+    "kind": "choice",
+    "topic": "design",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "You have an O(1) LRU cache and are asked to make it an LFU cache: evict the least frequently used entry, breaking ties by least recently used. What keeps every operation O(1)?",
+    "choices": [
+      "One doubly linked list per frequency, each internally in LRU order, plus a running minimum frequency; a node moves from its list to the next on every use",
+      "Store an access count in each node and scan the list for the smallest count when you need to evict",
+      "Replace the list with a min-heap keyed by access count",
+      "Keep the single list and re-sort it by access count after every operation"
+    ],
+    "answer": "One doubly linked list per frequency, each internally in LRU order, plus a running minimum frequency; a node moves from its list to the next on every use",
+    "explanation": "Bucketing by frequency turns 'least frequently used' into a map lookup instead of a search, and keeping each bucket in LRU order gives the tie-break for free. The minimum frequency is cheap to maintain because it only ever moves in two ways: it becomes 1 on an insert, and it increases by exactly one when the bucket it points at empties out through a hit. A heap is O(log n) per operation, scanning is O(n), and re-sorting is worse than either.",
+    "refs": [
+      "LC 460 LFU Cache",
+      "LC 146 LRU Cache"
+    ]
+  },
+  {
+    "id": "sorting-stable-worst-case",
+    "title": "Which sort, and what it costs",
+    "kind": "choice",
+    "topic": "sorting",
+    "difficulty": "easy",
+    "est_minutes": 3,
+    "prompt": "You must sort a large slice of records on one field, equal records have to keep their original relative order, and you need a hard worst-case time guarantee. What do you pick?",
+    "choices": [
+      "Merge sort: stable and O(n log n) in the worst case, paying O(n) extra space",
+      "Quicksort: in place and O(n log n) in the worst case",
+      "Quicksort with a random pivot, since randomisation removes the worst case",
+      "Heapsort: in place, O(n log n) in the worst case, and stable"
+    ],
+    "answer": "Merge sort: stable and O(n log n) in the worst case, paying O(n) extra space",
+    "explanation": "Quicksort's worst case is O(n^2), and a random pivot makes that unlikely rather than impossible, so it is not a guarantee; partitioning also swaps distant elements, which destroys stability. Heapsort does give the worst-case bound in place, but sifting moves elements past their equals, so it is not stable either. Stability plus a worst-case bound is exactly the pair that costs you the O(n) scratch buffer. That is why Go's sort.Slice is unstable and sort.SliceStable is a separate, more expensive call.",
+    "refs": [
+      "LC 912 Sort an Array",
+      "LC 148 Sort List"
+    ]
+  },
+  {
+    "id": "sorting-inversion-count-cost",
+    "title": "Why mid - i counts them all",
+    "kind": "complexity",
+    "topic": "sorting",
+    "difficulty": "medium",
+    "est_minutes": 4,
+    "prompt": "You count inversions by adding, whenever a merge takes an element from the right half, the number of left-half elements still unmerged. Why is that count correct in one step rather than one comparison at a time, and what is the total running time?",
+    "answer": "O(n log n). At that moment the left half is sorted and a[i] is its smallest remaining element, so a[i] > a[j] implies every one of the mid - i remaining left elements also exceeds a[j], and all of them sit at smaller indices, so each is an inversion with a[j]. The recursion has log n levels and each level merges n elements with O(1) counting work per element.",
+    "explanation": "The composition is what makes it a proof: inversions inside the left half and inside the right half are counted by the recursive calls, and every inversion that straddles the two is counted exactly once, at the moment its right-hand element is placed. The brute-force double loop is O(n^2), and note that the count itself can be as large as n(n-1)/2, which overflows 32 bits at around n = 100000.",
+    "hints": [
+      "Use the fact that the left half is already sorted at the moment you take from the right."
+    ],
+    "refs": [
+      "LC 493 Reverse Pairs",
+      "LC 315 Count of Smaller Numbers After Self"
+    ]
+  },
+  {
+    "id": "math-sieve-bounds",
+    "title": "The two p*p bounds in a sieve",
+    "kind": "recall",
+    "topic": "math",
+    "difficulty": "medium",
+    "est_minutes": 4,
+    "prompt": "In the sieve of Eratosthenes, why does the inner loop start marking at p*p instead of 2*p, why may the outer loop stop once p*p is at least n, and what is the running time?",
+    "answer": "Every multiple of p below p*p has a prime factor smaller than p, so it was already marked when that smaller prime took its turn; starting at p*p skips provably redundant work. The outer loop can stop at p*p >= n for the same reason: any composite below n has a factor no larger than its square root, so by then every composite is already marked. The total is O(n log log n), from summing n/p over the primes p below n.",
+    "explanation": "Both bounds are the same observation used twice: a composite is always caught by its smallest prime factor. Starting at 2*p is correct but does duplicate marking, and stopping the outer loop early is safe only because the remaining unmarked entries are exactly the primes. Space is O(n) bytes, or O(n) bits with a bitset, which is the usual reason a sieve is preferred over memoised trial division at O(n sqrt n).",
+    "hints": [
+      "Ask what the smallest prime factor of a number like 5 * 3 is, and whose turn it was marked on."
+    ],
+    "refs": [
+      "LC 204 Count Primes"
+    ]
+  },
+  {
+    "id": "math-primality-strategy",
+    "title": "Sieve or test per number",
+    "kind": "choice",
+    "topic": "math",
+    "difficulty": "easy",
+    "est_minutes": 2,
+    "prompt": "You have to answer 200000 queries of the form 'is x prime', where every x is below one million. What do you build?",
+    "choices": [
+      "One sieve up to one million at startup, then answer each query with an array lookup",
+      "Trial division up to the square root of x, once per query",
+      "A Miller-Rabin primality test per query",
+      "Trial division per query, memoised in a map so repeated values are free"
+    ],
+    "answer": "One sieve up to one million at startup, then answer each query with an array lookup",
+    "explanation": "The values are bounded and the queries are many, which is the precompute signal: one near-linear pass buys O(1) answers forever. Trial division is about a thousand divisions per query, so two hundred million in total, and memoising only helps if the queries actually repeat. Miller-Rabin is the right tool for the opposite shape, a few values that are far too large to sieve. The general rule is bounded range plus many queries means precompute, unbounded or huge values means a per-number test.",
+    "refs": [
+      "LC 204 Count Primes",
+      "LC 2521 Distinct Prime Factors of Product of Array"
+    ]
+  }
+]

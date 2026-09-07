@@ -1,0 +1,75 @@
+[
+  {
+    "id": "design-lru-cache-code",
+    "title": "An LRU cache with O(1) get and put",
+    "kind": "code",
+    "topic": "design",
+    "difficulty": "medium",
+    "est_minutes": 10,
+    "prompt": "Implement an LRU cache over ints. NewLRUCache(capacity) *LRUCache builds it, Get(key) returns the stored value or -1, and Put(key, value) inserts or updates, evicting the least recently used entry when the cache is full. Both Get and Put must be O(1); a Get counts as a use. The tests do a quarter of a million operations on a 50k-entry cache.",
+    "code": {
+      "stub": "type LRUCache struct {\n\tcapacity int\n}\n\n// NewLRUCache builds a cache that holds at most capacity entries.\nfunc NewLRUCache(capacity int) *LRUCache {\n\t// your code here\n\treturn &LRUCache{capacity: capacity}\n}\n\n// Get returns the value stored for key, or -1 if it is not present.\nfunc (c *LRUCache) Get(key int) int {\n\t// your code here\n\treturn -1\n}\n\n// Put inserts or updates key, evicting the least recently used entry if the\n// cache would go over capacity.\nfunc (c *LRUCache) Put(key, value int) {\n\t// your code here\n}",
+      "tests": "import \"testing\"\n\nfunc TestLRUEvictsLeastRecentlyUsed(t *testing.T) {\n\tc := NewLRUCache(2)\n\tc.Put(1, 1)\n\tc.Put(2, 2)\n\tif got := c.Get(1); got != 1 {\n\t\tt.Fatalf(\"Get(1) = %d, want 1\", got)\n\t}\n\tc.Put(3, 3)\n\tif got := c.Get(2); got != -1 {\n\t\tt.Fatalf(\"Get(2) = %d, want -1: key 2 was the least recently used\", got)\n\t}\n\tc.Put(4, 4)\n\tif got := c.Get(1); got != -1 {\n\t\tt.Fatalf(\"Get(1) = %d, want -1\", got)\n\t}\n\tif got := c.Get(3); got != 3 {\n\t\tt.Fatalf(\"Get(3) = %d, want 3\", got)\n\t}\n\tif got := c.Get(4); got != 4 {\n\t\tt.Fatalf(\"Get(4) = %d, want 4\", got)\n\t}\n}\n\nfunc TestLRUGetCountsAsUse(t *testing.T) {\n\tc := NewLRUCache(2)\n\tc.Put(1, 1)\n\tc.Put(2, 2)\n\tc.Get(1)\n\tc.Put(3, 3)\n\tif got := c.Get(2); got != -1 {\n\t\tt.Fatalf(\"Get(2) = %d, want -1: a Get must refresh recency\", got)\n\t}\n\tif got := c.Get(1); got != 1 {\n\t\tt.Fatalf(\"Get(1) = %d, want 1\", got)\n\t}\n}\n\nfunc TestLRUOverwriteDoesNotEvict(t *testing.T) {\n\tc := NewLRUCache(2)\n\tc.Put(1, 1)\n\tc.Put(2, 2)\n\tc.Put(1, 10)\n\tif got := c.Get(2); got != 2 {\n\t\tt.Fatalf(\"Get(2) = %d, want 2: overwriting an existing key must not evict\", got)\n\t}\n\tif got := c.Get(1); got != 10 {\n\t\tt.Fatalf(\"Get(1) = %d, want 10\", got)\n\t}\n}\n\nfunc TestLRUCapacityOne(t *testing.T) {\n\tc := NewLRUCache(1)\n\tc.Put(1, 1)\n\tc.Put(2, 2)\n\tif got := c.Get(1); got != -1 {\n\t\tt.Fatalf(\"Get(1) = %d, want -1\", got)\n\t}\n\tif got := c.Get(2); got != 2 {\n\t\tt.Fatalf(\"Get(2) = %d, want 2\", got)\n\t}\n}\n\n// Every operation has to be O(1). Scanning for the least recently used entry,\n// or re-sorting on each touch, will not finish this.\nfunc TestLRUIsConstantTime(t *testing.T) {\n\tconst size = 50000\n\tc := NewLRUCache(size)\n\tfor i := 0; i < size; i++ {\n\t\tc.Put(i, i)\n\t}\n\tfor round := 0; round < 4; round++ {\n\t\tfor i := 0; i < size; i++ {\n\t\t\tif got := c.Get(i); got != i {\n\t\t\t\tt.Fatalf(\"Get(%d) = %d, want %d\", i, got, i)\n\t\t\t}\n\t\t}\n\t}\n\tfor i := size; i < 2*size; i++ {\n\t\tc.Put(i, i)\n\t}\n\tif got := c.Get(0); got != -1 {\n\t\tt.Fatalf(\"Get(0) = %d, want -1 after the cache turned over completely\", got)\n\t}\n\tif got := c.Get(2*size - 1); got != 2*size-1 {\n\t\tt.Fatalf(\"Get(%d) = %d, want %d\", 2*size-1, got, 2*size-1)\n\t}\n}"
+    },
+    "answer": "type lruNode struct {\n\tkey, value int\n\tprev, next *lruNode\n}\n\ntype LRUCache struct {\n\tcapacity   int\n\titems      map[int]*lruNode\n\thead, tail *lruNode\n}\n\nfunc NewLRUCache(capacity int) *LRUCache {\n\thead, tail := &lruNode{}, &lruNode{}\n\thead.next, tail.prev = tail, head\n\treturn &LRUCache{\n\t\tcapacity: capacity,\n\t\titems:    make(map[int]*lruNode),\n\t\thead:     head,\n\t\ttail:     tail,\n\t}\n}\n\nfunc (c *LRUCache) Get(key int) int {\n\tn, ok := c.items[key]\n\tif !ok {\n\t\treturn -1\n\t}\n\tc.unlink(n)\n\tc.pushFront(n)\n\treturn n.value\n}\n\nfunc (c *LRUCache) Put(key, value int) {\n\tif n, ok := c.items[key]; ok {\n\t\tn.value = value\n\t\tc.unlink(n)\n\t\tc.pushFront(n)\n\t\treturn\n\t}\n\tif c.capacity <= 0 {\n\t\treturn\n\t}\n\tif len(c.items) == c.capacity {\n\t\tlru := c.tail.prev\n\t\tc.unlink(lru)\n\t\tdelete(c.items, lru.key)\n\t}\n\tn := &lruNode{key: key, value: value}\n\tc.items[key] = n\n\tc.pushFront(n)\n}\n\nfunc (c *LRUCache) unlink(n *lruNode) {\n\tn.prev.next = n.next\n\tn.next.prev = n.prev\n}\n\nfunc (c *LRUCache) pushFront(n *lruNode) {\n\tn.prev, n.next = c.head, c.head.next\n\tc.head.next.prev = n\n\tc.head.next = n\n}",
+    "explanation": "The map answers 'where is this key' in O(1), and the doubly linked list answers 'what was touched least recently' in O(1). The map stores the node itself, not the value, which is what makes the reordering cheap: on a hit you already hold the node, so unlinking it needs only its two neighbours. Sentinel head and tail nodes remove every nil check from unlink and pushFront, which is where hand-rolled versions usually break. Eviction is tail.prev, and the node carries its key so the map entry can be deleted without a reverse lookup.",
+    "hints": [
+      "Two structures, not one: something for lookup by key and something for ordering by recency.",
+      "Store the list node in the map rather than the value, or you will have to scan the list to find what to move.",
+      "Give the list permanent empty head and tail nodes so no insertion or removal has to special-case an empty list or an end."
+    ],
+    "refs": [
+      "LC 146 LRU Cache",
+      "LC 460 LFU Cache"
+    ]
+  },
+  {
+    "id": "sorting-count-inversions-code",
+    "title": "Count inversions with a merge sort",
+    "kind": "code",
+    "topic": "sorting",
+    "difficulty": "medium",
+    "est_minutes": 9,
+    "prompt": "Write countInversions(nums []int) int returning the number of pairs i < j where nums[i] > nums[j], without modifying nums. It must run in O(n log n): the tests pass a 200k-element reversed slice holding about 20 billion inverted pairs.",
+    "code": {
+      "stub": "// countInversions returns the number of pairs i < j with nums[i] > nums[j].\n// It must not modify nums.\nfunc countInversions(nums []int) int {\n\t// your code here\n\treturn 0\n}",
+      "tests": "import \"testing\"\n\nfunc TestCountInversionsSmall(t *testing.T) {\n\tcases := []struct {\n\t\tnums []int\n\t\twant int\n\t}{\n\t\t{nil, 0},\n\t\t{[]int{1}, 0},\n\t\t{[]int{1, 2, 3}, 0},\n\t\t{[]int{3, 2, 1}, 3},\n\t\t{[]int{2, 4, 1, 3, 5}, 3},\n\t\t{[]int{5, 5, 5}, 0},\n\t\t{[]int{2, 1, 2, 1}, 3},\n\t}\n\tfor _, tc := range cases {\n\t\tif got := countInversions(tc.nums); got != tc.want {\n\t\t\tt.Fatalf(\"countInversions(%v) = %d, want %d\", tc.nums, got, tc.want)\n\t\t}\n\t}\n}\n\nfunc TestCountInversionsMatchesBruteForce(t *testing.T) {\n\tseed := 99991\n\tnext := func() int {\n\t\tseed = (seed*1103515245 + 12345) & 0x7fffffff\n\t\treturn seed\n\t}\n\tfor trial := 0; trial < 20; trial++ {\n\t\tn := 1 + next()%300\n\t\tnums := make([]int, n)\n\t\tfor i := range nums {\n\t\t\tnums[i] = next()%50 - 25\n\t\t}\n\t\twant := 0\n\t\tfor i := 0; i < n; i++ {\n\t\t\tfor j := i + 1; j < n; j++ {\n\t\t\t\tif nums[i] > nums[j] {\n\t\t\t\t\twant++\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t\tif got := countInversions(nums); got != want {\n\t\t\tt.Fatalf(\"trial %d (n=%d): countInversions = %d, want %d\", trial, n, got, want)\n\t\t}\n\t}\n}\n\nfunc TestCountInversionsLeavesInputAlone(t *testing.T) {\n\tnums := []int{5, 1, 4, 2, 3}\n\tbefore := append([]int(nil), nums...)\n\tcountInversions(nums)\n\tfor i := range nums {\n\t\tif nums[i] != before[i] {\n\t\t\tt.Fatalf(\"input was reordered: %v, want it untouched at %v\", nums, before)\n\t\t}\n\t}\n}\n\n// 200k elements in reverse order hold 20 billion inverted pairs, so the count\n// has to fall out of a merge rather than out of a pairwise scan.\nfunc TestCountInversionsLargeIsFast(t *testing.T) {\n\tconst n = 200000\n\tnums := make([]int, n)\n\tfor i := range nums {\n\t\tnums[i] = n - i\n\t}\n\twant := n * (n - 1) / 2\n\tif got := countInversions(nums); got != want {\n\t\tt.Fatalf(\"countInversions(reversed) = %d, want %d\", got, want)\n\t}\n}"
+    },
+    "answer": "func countInversions(nums []int) int {\n\twork := append([]int(nil), nums...)\n\tbuf := make([]int, len(work))\n\treturn sortCount(work, buf, 0, len(work))\n}\n\n// sortCount sorts a[lo:hi] in place and returns the inversions it contained.\nfunc sortCount(a, buf []int, lo, hi int) int {\n\tif hi-lo < 2 {\n\t\treturn 0\n\t}\n\tmid := lo + (hi-lo)/2\n\tcount := sortCount(a, buf, lo, mid) + sortCount(a, buf, mid, hi)\n\ti, j, k := lo, mid, lo\n\tfor i < mid && j < hi {\n\t\tif a[i] <= a[j] {\n\t\t\tbuf[k] = a[i]\n\t\t\ti++\n\t\t} else {\n\t\t\tcount += mid - i\n\t\t\tbuf[k] = a[j]\n\t\t\tj++\n\t\t}\n\t\tk++\n\t}\n\tfor i < mid {\n\t\tbuf[k] = a[i]\n\t\ti++\n\t\tk++\n\t}\n\tfor j < hi {\n\t\tbuf[k] = a[j]\n\t\tj++\n\t\tk++\n\t}\n\tcopy(a[lo:hi], buf[lo:hi])\n\treturn count\n}",
+    "explanation": "Inside a merge, both halves are already sorted. When you take a[j] from the right half ahead of a[i], every one of the mid - i elements still waiting in the left half is at a smaller index and at least as large as a[i], which is greater than a[j], so each of them forms an inversion with a[j]. Adding mid - i therefore counts them all at once. Inversions wholly inside a half are counted by the recursive calls, and every cross-half inversion is counted exactly once here, so the sums compose. Copying nums first is what keeps the caller's slice untouched, and a single scratch buffer allocated once avoids an allocation per merge.",
+    "hints": [
+      "The answer is not a new algorithm, it is one extra line inside an algorithm you already know.",
+      "Ask what it means when the merge step takes an element from the right half before the left half is empty.",
+      "You need the count of remaining left-half elements at that moment, which is mid - i, not 1."
+    ],
+    "refs": [
+      "LC 493 Reverse Pairs",
+      "LC 315 Count of Smaller Numbers After Self",
+      "LC 912 Sort an Array"
+    ]
+  },
+  {
+    "id": "math-count-primes-code",
+    "title": "Count primes with a sieve",
+    "kind": "code",
+    "topic": "math",
+    "difficulty": "easy",
+    "est_minutes": 7,
+    "prompt": "Write countPrimes(n int) int returning how many primes are strictly less than n. n can be 5 million, so testing each candidate by trial division is too slow.",
+    "code": {
+      "stub": "// countPrimes returns how many prime numbers are strictly less than n.\nfunc countPrimes(n int) int {\n\t// your code here\n\treturn 0\n}",
+      "tests": "import \"testing\"\n\nfunc TestCountPrimesSmall(t *testing.T) {\n\tcases := []struct{ n, want int }{\n\t\t{0, 0},\n\t\t{1, 0},\n\t\t{2, 0},\n\t\t{3, 1},\n\t\t{4, 2},\n\t\t{10, 4},\n\t\t{11, 4},\n\t\t{12, 5},\n\t\t{100, 25},\n\t\t{1000, 168},\n\t}\n\tfor _, tc := range cases {\n\t\tif got := countPrimes(tc.n); got != tc.want {\n\t\t\tt.Fatalf(\"countPrimes(%d) = %d, want %d\", tc.n, got, tc.want)\n\t\t}\n\t}\n}\n\nfunc TestCountPrimesMatchesTrialDivision(t *testing.T) {\n\tisPrime := func(x int) bool {\n\t\tif x < 2 {\n\t\t\treturn false\n\t\t}\n\t\tfor d := 2; d*d <= x; d++ {\n\t\t\tif x%d == 0 {\n\t\t\t\treturn false\n\t\t\t}\n\t\t}\n\t\treturn true\n\t}\n\twant := 0\n\tfor n := 0; n <= 3000; n++ {\n\t\tif got := countPrimes(n); got != want {\n\t\t\tt.Fatalf(\"countPrimes(%d) = %d, want %d\", n, got, want)\n\t\t}\n\t\tif isPrime(n) {\n\t\t\twant++\n\t\t}\n\t}\n}\n\n// Trial division per candidate is roughly 10^9 operations here; the sieve is\n// the only approach that finishes.\nfunc TestCountPrimesLargeIsFast(t *testing.T) {\n\tif got := countPrimes(5000000); got != 348513 {\n\t\tt.Fatalf(\"countPrimes(5000000) = %d, want 348513\", got)\n\t}\n}"
+    },
+    "answer": "func countPrimes(n int) int {\n\tif n < 3 {\n\t\treturn 0\n\t}\n\tcomposite := make([]bool, n)\n\tfor p := 2; p*p < n; p++ {\n\t\tif composite[p] {\n\t\t\tcontinue\n\t\t}\n\t\tfor m := p * p; m < n; m += p {\n\t\t\tcomposite[m] = true\n\t\t}\n\t}\n\tcount := 0\n\tfor p := 2; p < n; p++ {\n\t\tif !composite[p] {\n\t\t\tcount++\n\t\t}\n\t}\n\treturn count\n}",
+    "explanation": "The sieve inverts the question: instead of asking of each number whether it has a factor, it walks the multiples of each prime and marks them. The inner loop starts at p*p because every smaller multiple of p has a factor below p and was already marked when that smaller prime had its turn. The outer loop can stop once p*p reaches n for the same reason: any composite below n has a factor no larger than its square root. The total work is the sum of n/p over primes below n, which is O(n log log n), close enough to linear that the array write is the real cost.",
+    "hints": [
+      "Do not ask 'is this number prime'. Ask 'what is this number a multiple of' and mark from the other direction.",
+      "Strictly less than n means index n-1 is the last candidate, so an array of length n indexed by the number itself is the natural shape.",
+      "Both loops have a bound involving p*p; work out why 2*p as the inner start is only wasted work."
+    ],
+    "refs": [
+      "LC 204 Count Primes",
+      "LC 2523 Closest Prime Numbers in Range"
+    ]
+  }
+]
