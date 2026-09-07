@@ -65,7 +65,7 @@ func run(args []string) error {
 func usage() {
 	fmt.Fprint(os.Stderr, `lcprac - short LeetCode pattern drills
 
-  lcprac drill [-m 12] [-topic X] [-kind K] [-diff D] [-seed N] [-noretry] [-nolimit] [-tries 3] [-builtin] [-weak] [-leech] [-problem X]
+  lcprac drill [-m 12] [-topic X] [-kind K] [-diff D] [-seed N] [-noretry] [-nolimit] [-tries 3] [-builtin] [-weak] [-leech] [-problem X] [-nosync]
       Run a timed session that fits the minute budget (default 12). The clock
       is real: once the budget is spent no new drill starts. -nolimit disables
       that and lets the session run long. A failed code drill offers another
@@ -76,6 +76,8 @@ func usage() {
       attempt it: give a number or part of a title, e.g. -problem 56.
       A saved session ends by naming one real problem behind the drills you
       just did, so the sitting can finish on the real thing.
+      If a sync server is set up, the session pulls before it starts and
+      pushes when it ends; -nosync skips that for one sitting.
   lcprac list [-topic X] [-kind K] [-diff D] [-builtin]
       List matching drills without running them. Yours are marked *.
   lcprac topics
@@ -112,11 +114,13 @@ func usage() {
       -problem carries a real problem into the new drill's refs and defaults
       its title and topic from it, so a gap lcprac problems named can be
       covered by number, e.g. -problem 261.
-  lcprac sync [-n] [-status] [-set-url URL] [-set-token TOKEN]
+  lcprac sync [-n] [-status] [-set-url URL] [-set-token TOKEN] [-auto on|off]
       Carry your history to and from your own sync server, so the laptop and
       the desktop share one streak. A sync pushes what this machine has and
       merges back what the others did; running it twice changes nothing the
-      second time. -n shows what would come back without writing it.
+      second time. -n shows what would come back without writing it. Drill
+      sessions sync on their own once a server is set; -auto off stops that
+      and leaves sync to this command.
   lcprac mine [-init]
       Show where your own drill files live and what they add. -init writes a
       commented example you can copy.
@@ -173,6 +177,7 @@ func cmdDrill(args []string) error {
 	weak := fs.Bool("weak", false, "spend the session on your weakest topic")
 	leech := fs.Bool("leech", false, "spend the session on the drills you keep missing")
 	problem := fs.String("problem", "", "spend the session on the drills behind one real problem")
+	nosync := fs.Bool("nosync", false, "do not sync with your sync server around this session")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -180,6 +185,12 @@ func cmdDrill(args []string) error {
 	set, err := loadDeck(*builtinOnly)
 	if err != nil {
 		return err
+	}
+	// Pull before the store is read, so a session started on the desktop
+	// schedules against what the laptop did this morning.
+	syncing := !*nosync && !*nosave
+	if syncing {
+		autoSync(os.Stdout, false)
 	}
 	store := openStore()
 	if *problem != "" {
@@ -233,6 +244,9 @@ func cmdDrill(args []string) error {
 		return err
 	}
 	suggestProblem(os.Stdout, set, store, rep, time.Now())
+	if syncing {
+		autoSync(os.Stdout, true)
+	}
 	return nil
 }
 

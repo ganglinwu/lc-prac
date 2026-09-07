@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/ganglinwu/lc-prac/internal/progress"
 	"github.com/ganglinwu/lc-prac/internal/synccli"
@@ -19,6 +20,7 @@ func cmdSync(args []string) error {
 	setToken := fs.String("set-token", "", "save the sync token and exit")
 	show := fs.Bool("status", false, "show where this machine syncs to")
 	dry := fs.Bool("n", false, "show what a sync would bring without saving it")
+	auto := fs.String("auto", "", "turn syncing around each drill session on or off")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -30,8 +32,8 @@ func cmdSync(args []string) error {
 	if err != nil {
 		return err
 	}
-	if *setURL != "" || *setToken != "" {
-		return saveSyncConfig(os.Stdout, path, cfg, *setURL, *setToken)
+	if *setURL != "" || *setToken != "" || *auto != "" {
+		return saveSyncConfig(os.Stdout, path, cfg, *setURL, *setToken, *auto)
 	}
 	if *show {
 		return showSync(os.Stdout, path, cfg)
@@ -41,18 +43,36 @@ func cmdSync(args []string) error {
 
 // saveSyncConfig updates only the fields you named, so setting a new token
 // does not make you retype the url.
-func saveSyncConfig(w io.Writer, path string, cfg synccli.Config, url, token string) error {
+func saveSyncConfig(w io.Writer, path string, cfg synccli.Config, url, token, auto string) error {
 	if url != "" {
 		cfg.URL = url
 	}
 	if token != "" {
 		cfg.Token = token
 	}
+	if auto != "" {
+		on, err := parseOnOff(auto)
+		if err != nil {
+			return err
+		}
+		cfg.Auto = &on
+	}
 	if err := synccli.SaveConfig(path, cfg); err != nil {
 		return err
 	}
-	fmt.Fprintf(w, "syncing to %s\nsaved to %s\n", cfg.URL, path)
+	fmt.Fprintf(w, "syncing to %s (%s around drill sessions)\nsaved to %s\n", cfg.URL, onOff(cfg.AutoEnabled()), path)
 	return nil
+}
+
+// parseOnOff takes the words the help text uses, not only Go's booleans.
+func parseOnOff(v string) (bool, error) {
+	switch strings.ToLower(v) {
+	case "on", "true", "yes", "1":
+		return true, nil
+	case "off", "false", "no", "0":
+		return false, nil
+	}
+	return false, fmt.Errorf("-auto wants on or off, not %q", v)
 }
 
 // showSync reports the destination without the token, so the output is safe to
@@ -62,8 +82,16 @@ func showSync(w io.Writer, path string, cfg synccli.Config) error {
 		fmt.Fprintf(w, "sync is not set up: %v\n", err)
 		return nil
 	}
-	fmt.Fprintf(w, "server: %s\ntoken:  set (%d chars)\nconfig: %s\n", cfg.URL, len(cfg.Token), path)
+	fmt.Fprintf(w, "server: %s\ntoken:  set (%d chars)\nauto:   %s around drill sessions\nconfig: %s\n",
+		cfg.URL, len(cfg.Token), onOff(cfg.AutoEnabled()), path)
 	return nil
+}
+
+func onOff(b bool) string {
+	if b {
+		return "on"
+	}
+	return "off"
 }
 
 // doSync runs the round trip and says what came back. Nothing is written
@@ -117,4 +145,58 @@ func printDelta(w io.Writer, d synccli.Delta) {
 	if d.NewAttempts > 0 {
 		fmt.Fprintf(w, "  %d problem attempt(s)\n", d.NewAttempts)
 	}
+}
+
+// autoSync is the sync a drill session does for you. It never returns an
+// error: a session must not fail because a server is down, so a problem is a
+// line on stderr and practice carries on with local history.
+func autoSync(w io.Writer, quiet bool) {
+	cfg, err := autoConfig()
+	if err != nil || cfg == nil {
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "lcprac: skipping auto sync:", err)
+		}
+		return
+	}
+	p, err := progress.DefaultPath()
+	if err != nil {
+		return
+	}
+	local, err := progress.Load(p)
+	if err != nil {
+		return
+	}
+	merged, delta, err := synccli.Sync(synccli.NewAutoClient(*cfg), local)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "lcprac: sync skipped:", err)
+		return
+	}
+	if !delta.Changed() {
+		return
+	}
+	if err := merged.Save(); err != nil {
+		fmt.Fprintln(os.Stderr, "lcprac: sync not saved:", err)
+		return
+	}
+	if quiet {
+		return
+	}
+	printDelta(w, delta)
+}
+
+// autoConfig returns the config only when this machine is set up and has not
+// turned auto sync off; nil means stay quiet rather than complain.
+func autoConfig() (*synccli.Config, error) {
+	path, err := synccli.ConfigPath()
+	if err != nil {
+		return nil, err
+	}
+	cfg, err := synccli.LoadConfig(path)
+	if err != nil {
+		return nil, err
+	}
+	if !cfg.Ready() || !cfg.AutoEnabled() {
+		return nil, nil
+	}
+	return &cfg, nil
 }

@@ -224,3 +224,42 @@ func TestPushSendsBearerToken(t *testing.T) {
 		t.Fatalf("Authorization = %q", got)
 	}
 }
+
+// A config written before auto sync existed has no auto field, and must still
+// sync on its own: setting up a server is the opt-in.
+func TestAutoDefaultsOnAndSurvivesARoundTrip(t *testing.T) {
+	t.Setenv("LCPRAC_SYNC_AUTO", "")
+	path := filepath.Join(t.TempDir(), "sync.json")
+	if err := os.WriteFile(path, []byte(`{"url":"https://host","token":"0123456789abcdef"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadConfig(path)
+	if err != nil || !cfg.AutoEnabled() {
+		t.Fatalf("cfg = %+v, %v", cfg, err)
+	}
+	off := false
+	cfg.Auto = &off
+	if err := SaveConfig(path, cfg); err != nil {
+		t.Fatal(err)
+	}
+	back, err := LoadConfig(path)
+	if err != nil || back.AutoEnabled() {
+		t.Fatalf("auto off did not survive: %+v, %v", back, err)
+	}
+}
+
+func TestAutoCanBeTurnedOffByEnvironment(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sync.json")
+	if err := os.WriteFile(path, []byte(`{"url":"https://host","token":"0123456789abcdef"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("LCPRAC_SYNC_AUTO", "0")
+	cfg, err := LoadConfig(path)
+	if err != nil || cfg.AutoEnabled() {
+		t.Fatalf("LCPRAC_SYNC_AUTO=0 ignored: %+v, %v", cfg, err)
+	}
+	t.Setenv("LCPRAC_SYNC_AUTO", "banana")
+	if _, err := LoadConfig(path); err == nil {
+		t.Fatal("a nonsense LCPRAC_SYNC_AUTO should be an error, not a silent off")
+	}
+}

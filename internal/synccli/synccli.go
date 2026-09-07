@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,7 +25,19 @@ import (
 type Config struct {
 	URL   string `json:"url"`
 	Token string `json:"token"`
+	// Auto is nil when never set, which reads as on: configuring a server is
+	// itself the opt-in, and an existing config file predates this field.
+	Auto *bool `json:"auto,omitempty"`
 }
+
+// AutoEnabled reports whether a drill session should sync on its own.
+func (c Config) AutoEnabled() bool {
+	return c.Auto == nil || *c.Auto
+}
+
+// Ready reports whether this machine has somewhere to sync to, so a caller can
+// stay quiet instead of reporting an error nobody asked for.
+func (c Config) Ready() bool { return c.Validate() == nil }
 
 // ConfigPath is sync.json beside progress.json, so one LCPRAC_HOME moves both.
 func ConfigPath() (string, error) {
@@ -53,6 +66,13 @@ func LoadConfig(path string) (Config, error) {
 	}
 	if v := os.Getenv("LCPRAC_SYNC_TOKEN"); v != "" {
 		c.Token = v
+	}
+	if v := os.Getenv("LCPRAC_SYNC_AUTO"); v != "" {
+		on, err := strconv.ParseBool(v)
+		if err != nil {
+			return c, fmt.Errorf("synccli: LCPRAC_SYNC_AUTO=%q is not a boolean", v)
+		}
+		c.Auto = &on
 	}
 	return c, nil
 }
@@ -107,6 +127,17 @@ type Client struct {
 // up practice.
 func NewClient(c Config) *Client {
 	return &Client{Config: c, HTTP: &http.Client{Timeout: 30 * time.Second}}
+}
+
+// AutoTimeout is the shorter budget an unattended sync gets: a session that
+// waits half a minute on an unreachable server has already cost more than the
+// sync was worth.
+const AutoTimeout = 8 * time.Second
+
+// NewAutoClient is the client for a sync nobody asked for, so it gives up
+// sooner than one typed by hand.
+func NewAutoClient(c Config) *Client {
+	return &Client{Config: c, HTTP: &http.Client{Timeout: AutoTimeout}}
 }
 
 // endpoint is the sync route on the configured server.

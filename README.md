@@ -445,7 +445,17 @@ lcprac sync -set-url https://lcprac.example -set-token <token>
 lcprac sync          # push what this machine did, merge back what the others did
 lcprac sync -n       # ... but only say what would come back
 lcprac sync -status  # where this machine syncs to (the token is not printed)
+lcprac sync -auto off  # stop drill sessions syncing on their own
 ```
+
+Once a server is set, you rarely type that command again: `lcprac drill` pulls
+before it picks drills and pushes when the sitting ends, so scheduling on the
+desktop already knows what the laptop did this morning. The pull reports what
+arrived; the push after the session is silent. A sync nobody asked for gets a
+short timeout and never fails the session: an unreachable server is a line on
+stderr and practice carries on with local history. `-nosync` skips it for one
+sitting, `lcprac sync -auto off` for good (`LCPRAC_SYNC_AUTO=0` for one run),
+and `-nosave` sessions never sync since they leave no history to carry.
 
 A sync is one round trip: this machine's whole history goes up, the server
 folds it into its copy, and the merged result comes back and is written here.
