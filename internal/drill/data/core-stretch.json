@@ -1,0 +1,135 @@
+[
+ {
+  "id": "knapsack-loop-direction",
+  "title": "Why the 0/1 capacity loop counts down",
+  "kind": "recall",
+  "topic": "knapsack",
+  "difficulty": "medium",
+  "est_minutes": 4,
+  "prompt": "Write the one-dimensional knapsack recurrence, then say which way the capacity loop runs for 0/1 and which way for unbounded, and what goes wrong if you swap them. Give the time and space cost.",
+  "answer": "With best[c] = the most value fitting in capacity c, folding in an item of weight w and value v is best[c] = max(best[c], best[c-w] + v). For 0/1, run c from capacity down to w: best[c-w] is then still the previous row, so the item enters at most once. For unbounded, run c from w up to capacity: best[c-w] may already include the item, which is exactly what letting it repeat means. Swapping them silently converts one problem into the other, with no crash and no wrong-looking output. Both are O(nW) time; one row makes it O(W) space.",
+  "explanation": "The two-dimensional form makes it obvious: best[i][c] = max(best[i-1][c], best[i-1][c-w] + v) reads only row i-1. Collapsing to one row is safe only if the cells you read have not yet been overwritten for this item, and descending c guarantees that. The unbounded version genuinely wants best[i][c-w], the same row, and ascending gives you that. This is the one line to be careful about in an interview, because both directions compile, both run fast, and only the tests tell them apart.",
+  "hints": [
+   "Write the two-dimensional recurrence first and mark which row each term comes from.",
+   "Ask, for one specific c, whether best[c-w] has already been touched by this item."
+  ],
+  "refs": [
+   "LC 416 Partition Equal Subset Sum",
+   "LC 518 Coin Change II"
+  ]
+ },
+ {
+  "id": "knapsack-huge-capacity-choice",
+  "title": "When O(nW) is not an option",
+  "kind": "choice",
+  "topic": "knapsack",
+  "difficulty": "medium",
+  "est_minutes": 3,
+  "prompt": "You have 40 items and a capacity near 10^9, and you need the exact best value. What do you reach for?",
+  "choices": [
+   "Split the items into two halves, enumerate every subset of each half, and match halves by sorting one side and binary searching it",
+   "The usual best[c] table, since 10^9 integers is only a few gigabytes",
+   "Greedy by value per unit weight, which is exact once the item count is small",
+   "A table indexed by total value instead of capacity, sized by the sum of all capacities"
+  ],
+  "answer": "Split the items into two halves, enumerate every subset of each half, and match halves by sorting one side and binary searching it",
+  "explanation": "O(nW) is pseudo-polynomial: it scales with the magnitude of the capacity, not with the number of digits, so 10^9 kills it on both time and memory. But n = 40 is small, and 2^20 per half is only a million subsets, so meet in the middle runs in about 2^(n/2) log(2^(n/2)) and is exact. Greedy by ratio is exact only for the fractional relaxation, never for 0/1. Indexing by value rather than capacity is a real and useful transpose when the values are small and the weights are huge, but here it is stated wrong: it would have to be sized by the sum of values, and nothing says those are small.",
+  "hints": [
+   "Which input is actually large: the item count, or the number written in the capacity?",
+   "2^40 is too many, but 2^20 twice is not."
+  ],
+  "refs": [
+   "LC 805 Split Array With Same Average",
+   "LC 956 Tallest Billboard"
+  ]
+ },
+ {
+  "id": "palindrome-manacher-mirror-rule",
+  "title": "What Manacher reuses from the mirror",
+  "kind": "recall",
+  "topic": "palindrome",
+  "difficulty": "hard",
+  "est_minutes": 4,
+  "prompt": "In Manacher's algorithm, say what rad[i] holds, how rad[i] is initialised from an already-computed position, and give the argument that the whole scan is O(n) despite the inner expansion loop.",
+  "answer": "On the padded string, rad[i] is the radius of the longest palindrome centred at i, which equals the length of the corresponding palindrome in the original string. Keep (centre, right), the palindrome computed so far whose right end is furthest along. If i < right, initialise rad[i] to min(rad[2*centre-i], right-i): the mirror of i inside that palindrome has the same neighbourhood, but only as far as the right edge, past which nothing has been compared yet. Then expand character by character, and if i + rad[i] passes right, make i the new centre. Linearity: every successful comparison in the expansion loop increases right by one, right never decreases, and right is bounded by the length of the padded string, so all expansions together cost O(n), and the failed comparison per position is one more O(n).",
+  "explanation": "The min is the whole subtlety, and both arms matter. Taking rad[2*centre-i] alone can overclaim, because the mirror's palindrome may stick out past the left edge of the current one where no character has been checked against the right side. Taking right-i alone throws away work you already did. Capping at right-i and continuing to compare is correct in either case. The amortised argument is the same shape as the one for the KMP prefix function, or for a monotonic stack: a quantity that only moves one way pays for the inner loop.",
+  "hints": [
+   "Ask what the mirror position's palindrome tells you about a region nobody has compared yet.",
+   "For the cost bound, find the quantity that increases on every iteration of the inner loop and never decreases."
+  ],
+  "refs": [
+   "LC 5 Longest Palindromic Substring",
+   "LC 214 Shortest Palindrome"
+  ]
+ },
+ {
+  "id": "palindrome-count-substrings-choice",
+  "title": "Counting palindromic substrings at scale",
+  "kind": "choice",
+  "topic": "palindrome",
+  "difficulty": "medium",
+  "est_minutes": 3,
+  "prompt": "You must count all palindromic substrings of a 100000-character string, counting each occurrence separately. The count itself can be around 5 * 10^9. What do you do?",
+  "choices": [
+   "Run Manacher and sum, over every centre, the number of palindromes centred there, which the radius gives directly",
+   "Expand around all 2n-1 centres and count as you go, which is linear because most expansions stop early",
+   "Fill the is-palindrome dynamic programming table over all pairs (i, j) and count the true cells",
+   "Insert every substring into a hash set and count the ones that read the same reversed"
+  ],
+  "answer": "Run Manacher and sum, over every centre, the number of palindromes centred there, which the radius gives directly",
+  "explanation": "A palindrome of radius r centred at one place contains exactly one palindrome per radius from 1 up to r sharing that centre, so the total is a sum of the radii, computed in O(n) once Manacher has run. Expanding around centres is not linear, it is O(n^2) in the worst case, and this problem hands you that worst case: a run of identical letters expands every centre to the string's edge. The pairwise table is O(n^2) time and, at 10^10 cells, impossible in memory. Hashing every substring is O(n^2) substrings before you even look at them, and it also answers a different question, since a set counts distinct palindromes rather than occurrences.",
+  "hints": [
+   "How many palindromes share a single centre, given the longest one there?",
+   "Ask what the string of all one letter does to each candidate."
+  ],
+  "refs": [
+   "LC 647 Palindromic Substrings",
+   "LC 5 Longest Palindromic Substring"
+  ]
+ },
+ {
+  "id": "sweep-line-event-tie-order",
+  "title": "Ordering events that land on the same x",
+  "kind": "recall",
+  "topic": "sweep-line",
+  "difficulty": "medium",
+  "est_minutes": 4,
+  "prompt": "A sweep processes start and end events sorted by coordinate. Say how you break the tie when a start and an end share a coordinate, for two cases: the skyline of buildings, and the fewest meeting rooms for half-open intervals. Explain why the two go opposite ways.",
+  "answer": "Skyline: process the starts first, then the ends, then read the height. A building ending exactly where the next begins should leave the outline flat, and settling the end first would report a drop to 0 and an immediate rise at the same x, which is both a wrong key point and a duplicate x. Meeting rooms with half-open intervals [s, e): process the ends first, so a room freed at time t is available to a meeting starting at t and the count does not spuriously go up. The two differ because the underlying interval convention differs: a building occupies its right edge as far as the outline is concerned, while a half-open meeting has already released time e.",
+  "explanation": "The rule to remember is that the tie-break is not a matter of taste, it encodes whether the interval is closed or half-open at its right end, so decide the convention from the problem statement and let the ordering follow. In code the tie-break is usually expressed as the sort key: represent a start as (x, 0) and an end as (x, 1) for the skyline, or the reverse for meeting rooms, or equivalently encode heights as (x, -h) for starts and (x, +h) for ends so one sort settles both. Getting this wrong produces output that is right everywhere except at coincident endpoints, which is exactly the case a hand-run small example tends to skip.",
+  "hints": [
+   "Write down the two-building case where one ends exactly where the next starts, and see what each order emits.",
+   "Ask whether the interval owns its right endpoint."
+  ],
+  "refs": [
+   "LC 218 The Skyline Problem",
+   "LC 253 Meeting Rooms II"
+  ]
+ },
+ {
+  "id": "sweep-line-difference-array-choice",
+  "title": "When the difference-array trick runs out",
+  "kind": "choice",
+  "topic": "sweep-line",
+  "difficulty": "medium",
+  "est_minutes": 3,
+  "prompt": "200000 half-open intervals have integer endpoints anywhere in 0..10^9, and you need the largest number that overlap at any single point. What is the right approach?",
+  "choices": [
+   "Sort the 400000 endpoints as +1 at a start and -1 at an end, then take the running maximum of the prefix sum",
+   "Build a difference array indexed by coordinate, add 1 at each start and subtract 1 at each end, then scan it",
+   "Merge the overlapping intervals and report the number merged into the longest resulting interval",
+   "For every interval, count how many other intervals contain its start, and take the largest count"
+  ],
+  "answer": "Sort the 400000 endpoints as +1 at a start and -1 at an end, then take the running maximum of the prefix sum",
+  "explanation": "The difference array is the same idea, but it is indexed by coordinate, so it costs an array of 10^9 cells here: fine when coordinates are small and dense, hopeless when they are sparse and large. Sorting the events instead is the coordinate-compressed version of exactly the same scan, at O(n log n) and O(n) space. Merging overlapping intervals answers a different question: a chain of intervals that overlap pairwise but never all at once merges into one long interval and inflates the count. Counting containment per interval is correct but O(n^2), which is 4 * 10^10 comparisons here.",
+  "hints": [
+   "Both of the first two options run the same scan; the difference is what the index means.",
+   "Multiply out the memory the coordinate-indexed version would need."
+  ],
+  "refs": [
+   "LC 253 Meeting Rooms II",
+   "LC 1094 Car Pooling",
+   "LC 731 My Calendar II"
+  ]
+ }
+]
