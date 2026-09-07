@@ -1,0 +1,127 @@
+[
+ {
+  "id": "lca-lifting-table-meaning",
+  "title": "What the lifting table holds",
+  "kind": "recall",
+  "topic": "lca",
+  "difficulty": "hard",
+  "est_minutes": 4,
+  "prompt": "State what up[k][v] means in a binary-lifting LCA, the recurrence that fills it, and the two phases of a query. Give the preprocessing and per-query costs.",
+  "answer": "up[k][v] is the ancestor of v exactly 2^k edges above it, or a sentinel when that is past the root, and up[0][v] is v's parent. The recurrence is up[k][v] = up[k-1][up[k-1][v]]: a jump of 2^k is two jumps of 2^(k-1). Filling it is O(n log n) time and space after one traversal that records depth. A query has two phases: lift the deeper node by the set bits of the depth difference so both sit at the same depth, and if they are now equal that node is the answer; otherwise walk k from high to low and lift both only when up[k][u] != up[k][v], which keeps both strictly below the LCA, so at the end up[0][u] is the LCA. That is O(log n) per query.",
+  "explanation": "The condition in the second phase is the part worth memorising. Lifting when the ancestors differ is safe because a differing pair proves you have not yet passed the LCA; lifting when they agree could jump over it. Since you never step onto the LCA itself, the answer is one parent up. The same table answers 'kth ancestor' directly by lifting on the bits of k, which is why LC 1483 is the same code.",
+  "hints": [
+   "Write down what a single jump of 2^k decomposes into.",
+   "In the second phase, ask whether lifting on equal ancestors could overshoot."
+  ],
+  "refs": [
+   "LC 1483 Kth Ancestor of a Tree Node",
+   "LC 236 Lowest Common Ancestor of a Binary Tree"
+  ]
+ },
+ {
+  "id": "lca-constant-time-queries",
+  "title": "When binary lifting is not the right LCA",
+  "kind": "choice",
+  "topic": "lca",
+  "difficulty": "hard",
+  "est_minutes": 3,
+  "prompt": "A static tree gets so many LCA queries that O(log n) each is the bottleneck, and you need O(1) per query after preprocessing. What do you build?",
+  "choices": [
+   "An Euler tour of the tree, reducing LCA to range minimum over the depth array, answered by a sparse table",
+   "A deeper lifting table, with up to 2n rows instead of log n",
+   "A hash map memoising every (u, v) pair as it is asked",
+   "Heavy-light decomposition, which answers LCA in O(1)"
+  ],
+  "answer": "An Euler tour of the tree, reducing LCA to range minimum over the depth array, answered by a sparse table",
+  "explanation": "Writing each node down every time the tour enters or leaves it turns 'lowest common ancestor of u and v' into 'shallowest node between their first occurrences', a range-minimum query. A sparse table answers that in O(1) with O(n log n) preprocessing, and the block-based Fischer-Heun method gets preprocessing to O(n). More lifting rows change nothing: the query cost is the log n loop, not the table height. Memoising is unbounded in the number of distinct pairs. Heavy-light decomposition is a real technique but its LCA query is O(log n), and it earns its keep on path updates, not on LCA alone.",
+  "hints": [
+   "The trick is to change the question into a different classic problem, not to speed up the same loop."
+  ],
+  "refs": [
+   "LC 236 Lowest Common Ancestor of a Binary Tree"
+  ]
+ },
+ {
+  "id": "scc-tarjan-lowlink",
+  "title": "Tarjan's lowlink and the root test",
+  "kind": "recall",
+  "topic": "scc",
+  "difficulty": "hard",
+  "est_minutes": 4,
+  "prompt": "In Tarjan's SCC algorithm, define disc[v] and low[v], state the test that says v is the root of a component, and say why the algorithm distinguishes 'on the stack' from 'already visited'.",
+  "answer": "disc[v] is the order in which v was first discovered. low[v] is the smallest disc value reachable from v's subtree using tree edges plus at most one edge back to a node still on the stack. v is the root of a component exactly when low[v] == disc[v]: nothing in its subtree found a way back above v, so v and everything above it on the stack up to v form one component and get popped. The on-stack test matters because a neighbour that was visited but already popped belongs to a finished component, and taking its disc into low would wrongly merge two components; only a node still on the stack is an ancestor or a sibling in the current, unfinished component.",
+  "explanation": "The whole algorithm is one traversal, so it does the work Kosaraju splits into two passes. The stack holds the nodes whose component is not yet decided, and low[v] answers 'can my subtree escape back up to an undecided node?'. If not, v is where the component ends. Confusing visited with on-stack is the classic bug and it shows up only on graphs with a cross edge into a finished component, which small hand-drawn tests rarely have.",
+  "hints": [
+   "Ask what it means for a node to have been popped already.",
+   "The root test compares two numbers about the same node."
+  ],
+  "refs": [
+   "LC 1192 Critical Connections in a Network"
+  ]
+ },
+ {
+  "id": "scc-condensation-2sat",
+  "title": "What the condensation buys you",
+  "kind": "choice",
+  "topic": "scc",
+  "difficulty": "hard",
+  "est_minutes": 3,
+  "prompt": "You contract every strongly connected component of a directed graph into a single node. What is true of the resulting condensation, and what does it let you do?",
+  "choices": [
+   "It is always a DAG, so it can be topologically sorted and longest-path or reachability DP becomes possible on a graph that had cycles",
+   "It is always a tree, so it can be rooted and traversed",
+   "It preserves the original edge count, so it is only a relabelling",
+   "It is still cyclic in general, which is why 2-SAT needs a separate algorithm"
+  ],
+  "answer": "It is always a DAG, so it can be topologically sorted and longest-path or reachability DP becomes possible on a graph that had cycles",
+  "explanation": "If the condensation had a cycle, the components on that cycle would all reach each other and would therefore have been one component, a contradiction. Being a DAG is the point: DP that was ill-defined on a cyclic graph (longest path, counting reachable nodes, propagating a maximum) becomes a topological-order sweep. 2-SAT is the standard payoff: build the implication graph on the 2n literals, and the formula is satisfiable exactly when no variable has x and not-x in the same component, with an assignment read off the reverse topological order. The condensation is generally not a tree, and contracting cycles strictly reduces the edge set to distinct pairs.",
+  "hints": [
+   "Suppose the contracted graph had a cycle. What would that say about the components on it?"
+  ],
+  "refs": [
+   "LC 1192 Critical Connections in a Network"
+  ]
+ },
+ {
+  "id": "concurrency-shared-slice-writes",
+  "title": "Writing results from many goroutines",
+  "kind": "recall",
+  "topic": "concurrency",
+  "difficulty": "medium",
+  "est_minutes": 4,
+  "prompt": "Several goroutines write results into one preallocated slice, each at its own index, and the caller reads the slice after wg.Wait(). Why is no mutex needed, and name three changes that would make it a data race.",
+  "answer": "Distinct indices of a slice are distinct memory, and make() fixed the backing array before any goroutine started, so no two goroutines touch the same bytes and the array is never moved. wg.Wait() returning after every wg.Done() establishes the happens-before edge that makes all those writes visible to the reader. It becomes a race if: the goroutines append to a shared slice instead of assigning to a reserved index, because append can reallocate and two appends can pick the same slot; two goroutines are handed the same index, or the index comes from a shared counter that is incremented without synchronisation; or the caller reads any of the slice before Wait returns, including from a progress logger or a timeout path that gives up early. Writing to a shared map instead of a slice is also a race even at distinct keys, because a Go map is one mutable structure.",
+  "explanation": "The rule underneath is that Go's memory model cares about overlapping memory and ordering, not about how many goroutines exist. A slice with a fixed backing array and one owner per index gives you disjointness for free, which is why the index-carrying worker pool needs no locking. Everything in the second half breaks either disjointness (append, duplicate index, map) or ordering (reading before Wait). Note also that wg.Add must be called before the go statement, not inside the goroutine, or Wait can return before the goroutine has registered.",
+  "hints": [
+   "Two conditions have to hold: the writes must not overlap, and the read must be ordered after them.",
+   "Think about what append is allowed to do to the backing array."
+  ],
+  "refs": [
+   "Go Memory Model",
+   "Effective Go: Concurrency"
+  ]
+ },
+ {
+  "id": "concurrency-semaphore-vs-pool",
+  "title": "Bounding fan-out over a million items",
+  "kind": "choice",
+  "topic": "concurrency",
+  "difficulty": "medium",
+  "est_minutes": 3,
+  "prompt": "You must process a million items with at most 16 running at once, and each item is cheap. Both a buffered channel used as a semaphore and a pool of 16 workers reading one job channel enforce the limit. Which fits better here, and why?",
+  "choices": [
+   "The worker pool, because the semaphore version still creates a goroutine per item and pays that cost a million times even though only 16 ever run",
+   "The semaphore, because a buffered channel is faster than an unbuffered one",
+   "The worker pool, because the semaphore version does not actually bound concurrency",
+   "Neither: with a million items you must batch, since 16 goroutines cannot be reused"
+  ],
+  "answer": "The worker pool, because the semaphore version still creates a goroutine per item and pays that cost a million times even though only 16 ever run",
+  "explanation": "Both bound concurrency correctly, so the choice is about what else they cost. The semaphore shape spawns one goroutine per item, each blocking on a channel send until a slot frees: a million stack allocations and a million scheduler entries for work that only ever needs 16 runners. The pool creates 16 goroutines and reuses them, and the job channel doubles as the queue. The semaphore shape wins when the items are few, when their durations vary a lot and you want the limit rather than a fixed queue split, or when each unit already needs its own goroutine for other reasons, such as holding a per-item context.",
+  "hints": [
+   "Both are correct. Count what each one allocates."
+  ],
+  "refs": [
+   "Go blog: Go Concurrency Patterns: Pipelines and cancellation"
+  ]
+ }
+]
