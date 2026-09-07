@@ -1,0 +1,136 @@
+[
+  {
+    "id": "monotonic-stack-invariant",
+    "title": "What a monotonic stack actually buys you",
+    "kind": "recall",
+    "topic": "monotonic-stack",
+    "difficulty": "medium",
+    "est_minutes": 4,
+    "prompt": "You are scanning an array left to right with a stack whose heights are kept increasing. State what you learn about a bar at the moment it is popped, what its two boundaries are, and why the whole scan is O(n).",
+    "answer": "At the moment a bar is popped you have just met the first bar to its right that is smaller than it: that is the bar whose arrival forced the pop, so it is the right boundary. Its left boundary is the entry sitting underneath it on the stack, which is the first bar to its left that is smaller, because everything between them was popped earlier for being taller. So the popped bar spans the open interval between those two indices, width right - left - 1, and both boundaries were computed without any second scan. The cost is O(n) because every index is pushed exactly once and popped at most once, so the inner while loop runs at most n times in total across the whole outer loop, not n times per iteration.",
+    "explanation": "The stack is not a container you are searching, it is a record of the bars whose right boundary is still unknown, kept in the only order that can happen: a taller bar pushed later is blocked from the left by the shorter one below it. That is why 'next smaller element', 'previous smaller element', 'largest rectangle' and 'trapping rain water' are all the same loop with a different line inside the pop. The amortised argument is the part people get wrong in interviews: a nested while loop is not automatically quadratic when its total work is bounded by the number of pushes.",
+    "hints": [
+      "Ask what event causes a pop, and what that event tells you about the element being popped.",
+      "Count total pushes and pops rather than looking at the shape of the loops."
+    ],
+    "refs": [
+      "LC 84 Largest Rectangle in Histogram",
+      "LC 496 Next Greater Element I",
+      "LC 739 Daily Temperatures"
+    ]
+  },
+  {
+    "id": "monotonic-stack-vs-deque",
+    "title": "Stack or deque",
+    "kind": "choice",
+    "topic": "monotonic-stack",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "You need the maximum of every window of size k as the window slides across the array. Which structure, and what makes it different from the next-greater-element problem?",
+    "choices": [
+      "A monotonic deque, because elements must also leave from the front when they fall out of the window",
+      "A monotonic stack, since maximum queries are the same problem as next greater element",
+      "A max-heap of the whole array, popping until the top is inside the window",
+      "A monotonic stack rebuilt from scratch at each window position"
+    ],
+    "answer": "A monotonic deque, because elements must also leave from the front when they fall out of the window",
+    "explanation": "Both structures keep the same monotonic invariant and both discard from the back when a better element arrives. The difference is expiry: in next-greater-element an element leaves only when a smaller one arrives, which is a stack, while in a sliding window an element also leaves because its index has fallen off the left edge, and that removal is at the opposite end. Two ends means a deque. The heap answer is not wrong so much as worse: lazy deletion gives O(n log n) and O(n) memory against the deque's O(n) and O(k), and it is the right fallback only when the window is defined by a value rather than a fixed count. Rebuilding per position is O(nk).",
+    "hints": [
+      "Ask what causes an element to become useless, and there are two answers here rather than one."
+    ],
+    "refs": [
+      "LC 239 Sliding Window Maximum",
+      "LC 739 Daily Temperatures"
+    ]
+  },
+  {
+    "id": "string-dp-table-shape",
+    "title": "Reading a two-string DP off the table",
+    "kind": "recall",
+    "topic": "string-dp",
+    "difficulty": "medium",
+    "est_minutes": 4,
+    "prompt": "Edit distance, longest common subsequence and shortest common supersequence all fill an (n+1) by (m+1) table over prefixes of two strings. State the shared shape: what dp[i][j] means, what the base row and column are, and what changes between the three problems.",
+    "answer": "dp[i][j] is the answer for the first i bytes of a against the first j bytes of b, so the extra row and column represent the empty prefix and the answer is dp[n][m]. The base row and column are the cost of matching a prefix against nothing: i and j for edit distance and for the supersequence length, 0 for LCS. Every cell looks at three neighbours, dp[i-1][j-1], dp[i-1][j] and dp[i][j-1], and the only thing that varies is what you do with them. Edit distance takes the diagonal on a match and otherwise 1 + min of all three. LCS takes diagonal + 1 on a match and otherwise max of the two sides. Shortest common supersequence takes diagonal + 1 on a match and otherwise 1 + min of the two sides. All three are O(n*m) time, and all three collapse to O(min(n, m)) space if you only need the number rather than the alignment.",
+    "explanation": "Recognising the shape is most of the value: once you see two strings consumed independently from the left, the table is fixed and only the recurrence line is up for grabs. The relationship len(a) + len(b) = LCS-based supersequence length, and edit-distance-without-substitution = len(a) + len(b) - 2*LCS, follows directly from that shared frame. The space collapse has a real cost worth stating out loud in an interview: reconstructing the actual alignment needs the full table, or Hirschberg's divide-and-conquer to get it back in linear space.",
+    "hints": [
+      "Write the meaning of a cell in words first, including what the zeroth row stands for.",
+      "List the three neighbours every cell reads, then ask what each problem does with them."
+    ],
+    "refs": [
+      "LC 72 Edit Distance",
+      "LC 1143 Longest Common Subsequence",
+      "LC 1092 Shortest Common Supersequence"
+    ]
+  },
+  {
+    "id": "string-dp-subsequence-vs-substring",
+    "title": "One index or two",
+    "kind": "choice",
+    "topic": "string-dp",
+    "difficulty": "medium",
+    "est_minutes": 3,
+    "prompt": "Longest common subsequence and longest common substring have almost the same table. What is the actual difference, and where does the answer come from?",
+    "choices": [
+      "Substring has no carry-over on a mismatch: the cell resets to 0 and the answer is the maximum cell anywhere, not dp[n][m]",
+      "Substring needs a third dimension for the starting index",
+      "Substring is the same recurrence run on the reversed strings",
+      "Substring cannot be done in O(n*m) and needs a suffix automaton"
+    ],
+    "answer": "Substring has no carry-over on a mismatch: the cell resets to 0 and the answer is the maximum cell anywhere, not dp[n][m]",
+    "explanation": "A subsequence may skip, so on a mismatch dp[i][j] inherits the better of its two neighbours and the value only ever grows, which is why the bottom-right corner holds the answer. A substring must be contiguous, so dp[i][j] means 'common run ending exactly at i and j' and a mismatch kills the run outright; the best run can end anywhere, so you track a running maximum while filling. Both are O(n*m). The reversal trick belongs to a different problem, longest palindromic subsequence, which is LCS of a string with its own reverse. Suffix structures do solve longest common substring faster for many strings at once, but they are not required for two.",
+    "hints": [
+      "Ask what a mismatch is allowed to do to the value you have accumulated so far."
+    ],
+    "refs": [
+      "LC 1143 Longest Common Subsequence",
+      "LC 718 Maximum Length of Repeated Subarray",
+      "LC 516 Longest Palindromic Subsequence"
+    ]
+  },
+  {
+    "id": "max-flow-residual-necessity",
+    "title": "Why the reverse arc exists",
+    "kind": "recall",
+    "topic": "max-flow",
+    "difficulty": "hard",
+    "est_minutes": 4,
+    "prompt": "In an augmenting-path max-flow algorithm, every arc is stored alongside a reverse arc of capacity 0. Explain precisely what pushing flow along that reverse arc means, and give the smallest network where omitting it gives the wrong answer.",
+    "answer": "Sending f along the reverse arc of (u, v) does not move anything from v to u: it cancels f units that had previously been routed u to v, freeing that capacity to be used elsewhere. That is what makes augmentation self-correcting, so no individual path choice can be a mistake you are stuck with. The smallest counterexample is the four-node diamond: s to a and s to b both with capacity 1, a to b with capacity 1, a to t and b to t both with capacity 1. The true answer is 2. A greedy that first takes s, a, b, t saturates the middle arc and then finds no second path, reporting 1; with residual arcs, the second search goes s, b, then backwards along b to a via the reverse arc, then a to t, which cancels the middle unit and yields 2. Once no augmenting path exists, the nodes still reachable from s in the residual graph form a cut whose capacity equals the flow, which is the max-flow min-cut theorem and the reason termination implies optimality.",
+    "explanation": "This is the one idea in max flow that is not bookkeeping. Without it augmentation is a greedy heuristic; with it, 'I cannot find a path' upgrades from 'I am stuck' to a proof of optimality via the cut. The diamond is worth memorising because it is small enough to draw during an interview and it is exactly the shape the machine-graded drill's random min-cut cross-check keeps producing.",
+    "hints": [
+      "Ask what physical event a unit of flow travelling backwards could correspond to.",
+      "Try to build the smallest network where the first path you would naturally pick blocks the second."
+    ],
+    "refs": [
+      "Max-flow min-cut theorem",
+      "Ford-Fulkerson method",
+      "Dinic's algorithm"
+    ]
+  },
+  {
+    "id": "max-flow-modelling-choice",
+    "title": "Modelling a constraint as a flow",
+    "kind": "choice",
+    "topic": "max-flow",
+    "difficulty": "hard",
+    "est_minutes": 3,
+    "prompt": "You must assign shifts to workers. Each worker can take at most 3 shifts and each shift needs exactly 1 worker. How do you express the per-worker limit in the flow network?",
+    "choices": [
+      "Give the arc from the source to each worker capacity 3, leaving every worker-to-shift arc at capacity 1",
+      "Give every worker-to-shift arc capacity 3",
+      "Run the matching three times, removing the shifts already covered",
+      "Add a capacity of 3 on the arcs from shifts to the sink"
+    ],
+    "answer": "Give the arc from the source to each worker capacity 3, leaving every worker-to-shift arc at capacity 1",
+    "explanation": "Flow conservation means everything leaving a worker node had to enter it, so the single arc into that node is the natural place to cap the total, and this is the standard node-capacity trick. Capacity 3 on a worker-to-shift arc would instead allow one worker to take the same shift three times, which is meaningless. Capacity on the shift-to-sink arcs bounds how many workers a shift takes, not how many shifts a worker takes, so it answers the other question. Repeated matching is a greedy over three rounds with no way to undo an earlier round's assignment, so it can leave shifts uncovered that a single flow would have filled. A general node capacity, where the limit is on a node with many in-arcs, is done by splitting the node into in and out halves joined by an arc of that capacity.",
+    "hints": [
+      "Ask which single arc every unit of a worker's flow has to pass through."
+    ],
+    "refs": [
+      "LC 1349 Maximum Students Taking Exam",
+      "Hopcroft-Karp algorithm",
+      "Max-flow min-cut theorem"
+    ]
+  }
+]
